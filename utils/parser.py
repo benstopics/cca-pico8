@@ -130,15 +130,16 @@ def tokenize(filename):
             
             if not current_line or current_line.startswith('C'): continue
 
-            if '\t' not in current_line:
-                raise Exception('Missing tab, identification column could not be identified')
+            if len(current_line) < 5:
+                raise Exception('Identification column could not be identified, too few columns')
             else:
                 # Statement ID & Data
-                [stmt_id, stmt_data] = f' {current_line}'.split('\t')
+                stmt_id = current_line[:5]
                 try:
                     stmt_id = int(stmt_id)
                 except:
                     stmt_id = None
+                stmt_data = current_line[5:]
             
             # Line continuation
             if (
@@ -273,14 +274,10 @@ def build_ast(tokens: List[Token]):
 
         sa.error(token, f'Invalid syntax {token.chars}')
 
-def main():
-    
-    tokens = tokenize('cca.f')
+def parse():
+    tokens = tokenize('formatted-cca.f')
     ast = build_ast(tokens)
     pass
 
 if __name__ == "__main__":
-    main()
-
-# Things to implement:
-# 
+    parse()
