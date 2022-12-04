@@ -9,7 +9,7 @@ logical_ops = {
 
 relational_ops = {
     'EQ': '==',
-    'NE': '!=',
+    'NE': '~=',
     'GT': '>',
     'LT': '<',
     'GE': '>=',
@@ -84,9 +84,12 @@ class Emitter:
         if (
             isinstance(expr, int)
             or isinstance(expr, float)
-            or isinstance(expr, str)
         ):
             self.output(str(expr))
+            return self
+        if isinstance(expr, str):
+            s = expr.replace("\n", "\\n")
+            self.output(f'"{s}"')
             return self
         if isinstance(expr, RandExpr):
             self.output('math.random()')
@@ -103,7 +106,7 @@ class Emitter:
     
     def emit_goto(self, goto: Goto):
         if len(goto.stmt_ids) == 1:
-            self.output(f'goto l{str(goto.stmt_ids[0])}\n')
+            self.output(f'goto l{str(goto.stmt_ids[0]).zfill(5)}\n')
             return
         
         mname = f'plex{self.get_unique_id()}'
@@ -117,7 +120,7 @@ class Emitter:
                 self.output('\n')
             if i == 0 or i < len(goto.stmt_ids) - 1:
                 self.output(f'if ({mname}=={i + 1}) then\n')
-            self.output(f'goto l{goto.stmt_ids[i]}\n')
+            self.output(f'goto l{str(goto.stmt_ids[i]).zfill(5)}\n')
             if i == len(goto.stmt_ids) - 1:
                 self.output('end\n')
         pass
@@ -171,7 +174,7 @@ class Emitter:
     def emit_for_loop(self, forloop: ForLoop, continue_id=None):
         if continue_id is None:
             continue_id = self.get_unique_id()
-            self.output(f'::c{continue_id}::\n')
+            self.output(f'::c{continue_id.zfill(5)}::\n')
         self.continue_id_stack.append(continue_id)
         self.output(f'for {forloop.counter_name}=')
         self.emit_expr(forloop.start_expr)
@@ -237,7 +240,7 @@ class Emitter:
                 if f == '\n':
                     self.output(f'fortran_write("\\n")\n')
                 else:
-                    self.output(f'fortran_write("{f}")\n')
+                    self.output(f'fortran_write({Emitter().emit_expr(f).output_buffer})\n')
                 continue
             if isinstance(f, FormatPattern):
                 mem_ref = write.value_list[insert_idx]
@@ -267,11 +270,11 @@ class Emitter:
     def emit_arithmetic_if(self, if_stmt: ArithmeticIfStatement):
         self.output('if (')
         self.emit_expr(if_stmt.cond)
-        self.output(f'<0) then\ngoto {if_stmt.neg_stmt_id}\n')
+        self.output(f'<0) then\ngoto l{str(if_stmt.neg_stmt_id).zfill(5)}\n')
         self.output('elseif (')
         self.emit_expr(if_stmt.cond)
-        self.output(f'==0) then\ngoto {if_stmt.zero_stmt_id}\n')
-        self.output(f'else\ngoto {if_stmt.pos_stmt_id}\nend\n')
+        self.output(f'==0) then\ngoto l{str(if_stmt.zero_stmt_id).zfill(5)}\n')
+        self.output(f'else\ngoto l{str(if_stmt.pos_stmt_id).zfill(5)}\nend\n')
 
     def emit_statement(self, stmt: Statement):
         if stmt.id is not None:
@@ -293,7 +296,7 @@ class Emitter:
             if isinstance(n, CallSubroutine): self.emit_call(n); continue
             if isinstance(n, ReadStatement): self.emit_read(n); continue
             if isinstance(n, FormatPattern): continue
-            if isinstance(n, Continue): self.output(f'goto c{self.continue_id_stack[-1]}\n'); continue
+            if isinstance(n, Continue): self.output(f'goto c{str(self.continue_id_stack[-1]).zfill(5)}\n'); continue
             if isinstance(n, Stop) or isinstance(n, ExitProgram): self.output('stop()\n'); continue
             if isinstance(n, Pause): self.output(f'pause("{n.msg}")\n'); continue
             if isinstance(n, TypeStatement): self.emit_write(n); continue
