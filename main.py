@@ -1,10 +1,10 @@
-from utils.parser import parse
-from utils.tabs_to_columns import columnize_tabs
+from utils.parser import build_ast
+from utils.pico8 import export_cartridge
 
 
 def main():
-    parse()
-    #columnize_tabs()
+    ast = build_ast('formatted-cca.f')
+    export_cartridge(ast, 'formatted-cca.dat')
 
 if __name__ == "__main__":
     main()

@@ -1,6 +1,7 @@
 import re
 from typing import List
 import inspect
+from utils.parser.models import *
 
 
 OPERATORS = ['(', ')', ',', '"', "'", '.', '=', '?', '!']
@@ -204,154 +205,6 @@ def get_raw_statements(filename):
     
     return stmts
 
-class Program:
-    def __init__(self, ):
-        pass
-
-class Implicit:
-    def __init__(self, datatype, pattern):
-        self.datatype = datatype
-        self.pattern = pattern
-
-class EnableRand: pass
-
-class GlobalVarDef:
-    def __init__(self, name):
-        self.name = name
-
-class LocalVarDef:
-    def __init__(self, name):
-        self.name = name
-
-class ArrayDef:
-    def __init__(self, name, dims):
-        self.name = name
-        self.dims = dims
-
-class ArithmeticExpr:
-    def __init__(self, lterm, op, rterm):
-        self.lterm = lterm
-        self.op = op
-        self.rterm = rterm
-
-class RelationalExpr:
-    def __init__(self, lterm, op, rterm):
-        self.lterm = lterm
-        self.op = op
-        self.rterm = rterm
-
-class LogicalExpr:
-    def __init__(self, lterm, op, rterm):
-        self.lterm = lterm
-        self.op = op
-        self.rterm = rterm
-
-class LogicalIfStatement:
-    def __init__(self, cond, stmt):
-        self.cond = cond
-        self.stmt = stmt
-
-class ArithmeticIfStatement:
-    def __init__(self, cond, neg_stmt_id, zero_stmt_id, pos_stmt_id):
-        self.cond = cond
-        self.neg_stmt_id = neg_stmt_id
-        self.zero_stmt_id = zero_stmt_id
-        self.pos_stmt_id = pos_stmt_id
-
-class Statement:
-    def __init__(self, id, nodes):
-        self.id = id
-        self.nodes = nodes if isinstance(nodes, list) else [nodes]
-
-class VariableRef:
-    def __init__(self, name):
-        self.name = name
-
-class ArrayRef:
-    def __init__(self, name, indexes):
-        self.name = name
-        self.indexes = indexes
-
-class NegateExpr:
-    def __init__(self, expr):
-        self.expr = expr
-
-class Goto:
-    def __init__(self, stmt_ids, multiplexer_expr=0):
-        self.stmt_ids = stmt_ids
-        self.multiplexer_expr = multiplexer_expr
-
-class Assignment:
-    def __init__(self, memory_ref, value_expr):
-        self.memory_ref = memory_ref
-        self.value_expr = value_expr
-
-class ArrayRefRange:
-    def __init__(self, array_loc_ref, start_idx, stop_idx):
-        self.array_loc_ref = array_loc_ref
-        self.start_idx = start_idx
-        self.stop_idx = stop_idx
-
-class ArrayAssignment:
-    def __init__(self, array_ref_range, values):
-        self.array_ref_range = array_ref_range
-        self.values = values
-
-class ForLoop:
-    def __init__(self, counter_name, start_expr, stop_expr, body_stmts):
-        self.counter_name = counter_name
-        self.start_expr = start_expr
-        self.stop_expr = stop_expr
-        self.body_stmts = body_stmts
-
-class CallSubroutine:
-    def __init__(self, name, args):
-        self.name = name
-        self.args = args
-
-class ReadStatement:
-    def __init__(self, device_id, formats, memory_refs):
-        self.device_id = device_id
-        self.formats = formats
-        self.memory_refs = memory_refs
-
-class TypeStatement:
-    def __init__(self, formats, value_list):
-        self.formats = formats
-        self.value_list = value_list
-
-class FormatPattern:
-    def __init__(self, units=None, type=None, width=None):
-        self.units = units
-        self.type = type
-        self.width = width
-
-class Modulo:
-    def __init__(self, quotient, divisor):
-        self.quotient = quotient
-        self.divisor = divisor
-
-class Continue: pass
-
-class Pause:
-    def __init__(self, msg):
-        self.msg = msg
-
-class Stop: pass
-
-class RandExpr: pass
-
-class ExitProgram: pass
-
-class ReturnSubroutine: pass
-
-class ReadInputKey: pass
-
-class Subroutine:
-    def __init__(self, name, params, body_stmts):
-        self.name = name
-        self.params = params
-        self.body_stmts = body_stmts
 
 class SyntacticAnalyzer:
     def __init__(self, stmts: List[RawStatement]):
@@ -569,17 +422,22 @@ class SyntacticAnalyzer:
                 self.consume('.')
                 if isinstance(self.lookahead(), LogicalOperator):
                     op = self.consume(LogicalOperator)
+                    self.consume('.')
+                    rterm = self.get_logical_expr()
+                    expr = LogicalExpr(expr, op, rterm)
                 elif isinstance(self.lookahead(), RelationalOperator):
                     op = self.consume(RelationalOperator)
+                    self.consume('.')
+                    rterm = self.get_logical_expr()
+                    expr = RelationalExpr(expr, op, rterm)
                 else:
                     self.error(self.lookahead(), 'Expected logical or relational operator')
-                self.consume('.')
             elif isinstance(self.lookahead(), ArithmeticOperator):
                 op = self.consume(ArithmeticOperator)
+                rterm = self.get_logical_expr()
+                expr = ArithmeticExpr(expr, op, rterm)
             else:
                 self.error(self.lookahead(), 'Expected arithmetic operator')
-            rterm = self.get_logical_expr()
-            expr = LogicalExpr(expr, op, rterm)
         
         return expr
     
@@ -643,13 +501,13 @@ class SyntacticAnalyzer:
         self.consume('(')
         array_loc_ref = self.get_array_loc_ref()
         self.consume(',')
-        self.consume(Identifier)
+        counter_name = self.consume(Identifier)
         self.consume('=')
-        start_idx = self.get_value_expr()
+        start_expr = self.get_value_expr()
         self.consume(',')
-        stop_idx = self.get_value_expr()
+        stop_expr = self.get_value_expr()
         self.consume(')')
-        return ArrayRefRange(array_loc_ref, start_idx, stop_idx)
+        return ArrayRefRange(array_loc_ref, start_expr, stop_expr, counter_name)
     
     def get_data(self):
         self.consume('DATA')
@@ -685,7 +543,7 @@ class SyntacticAnalyzer:
 
         body_stmts = []
 
-        while self.raw_stmts[self.stmt_cursor + 1].id != stop_stmt_id:
+        while self.raw_stmts[self.stmt_cursor].id != stop_stmt_id:
             self.consume(EndOfLine)
             body_stmts.append(self.get_statement(self.next_statement()))
             
@@ -714,6 +572,7 @@ class SyntacticAnalyzer:
                 if sa.lookahead().chars == '/':
                     sa.consume('/')
                     return text + '\n'
+                return text
             
             if sa.lookahead().chars == '/':
                 sa.consume('/')
@@ -724,12 +583,11 @@ class SyntacticAnalyzer:
                 pattern += sa.consume(IntegerConstant)
             if isinstance(sa.lookahead(), Identifier):
                 pattern += sa.consume(Identifier)
-            if match := re.match(r'^(\d*)([A-Z]?)(\d*)$', pattern):
-                unit, type, width = match.groups()
+            if match := re.match(r'^(\d*)([A-Z]?\d*)$', pattern):
+                unit, type = match.groups()
                 return FormatPattern(
                     int(unit) if unit else None,
-                    type or None,
-                    int(width) if width else None
+                    type or None
                 )
             sa.error(sa.lookahead(), f'Invalid FORMAT pattern {pattern}')
 
@@ -737,9 +595,12 @@ class SyntacticAnalyzer:
         sa.consume(')')
         return formats
     
-    def find_stmt_by_id(self, id):
+    def find_stmt_by_id(self, id, start_idx=0):
         stmt = None
-        for stmt in self.raw_stmts:
+        for stmt_idx in range(len(self.raw_stmts)):
+            if stmt_idx < start_idx: continue
+            
+            stmt = self.raw_stmts[stmt_idx]
             if stmt.id == id:
                 stmt = stmt
                 break
@@ -792,7 +653,7 @@ class SyntacticAnalyzer:
         
         formats = self.get_formats(self.find_stmt_by_id(int(format_stmt_id)))
 
-        return TypeStatement(value_list, formats)
+        return TypeStatement(formats, value_list)
     
     def get_subroutine(self):
         self.consume('SUBROUTINE')
@@ -815,9 +676,12 @@ class SyntacticAnalyzer:
     
     def get_accept(self):
         self.consume('ACCEPT')
-        while not isinstance(self.lookahead(), EndOfLine):
-            self.consume()
-        return ReadInputKey()
+        format_stmt_id = self.get_integer_const()
+        self.consume(',')
+        array_ref_range = self.get_array_ref_range()
+        formats = self.get_formats(self.find_stmt_by_id(int(format_stmt_id), start_idx=self.stmt_cursor))
+
+        return Accept(formats, array_ref_range)
 
     def get_statement(self, stmt: RawStatement=None, subroutine=False):
         def get_nodes():
@@ -835,7 +699,7 @@ class SyntacticAnalyzer:
                 if self.lookahead().chars == 'DO': return self.get_do_loop()
                 if self.lookahead().chars == 'CALL': return self.get_call()
                 if self.lookahead().chars == 'READ': return self.get_read()
-                if self.lookahead().chars == 'FORMAT': return self.get_formats()
+                if self.lookahead().chars == 'FORMAT': self.get_formats(); return
                 if self.lookahead().chars == 'CONTINUE': self.consume(); return Continue()
                 if self.lookahead().chars == 'STOP': self.consume(); return Stop()
                 if self.lookahead().chars == 'PAUSE': return self.get_pause()
@@ -854,19 +718,16 @@ class SyntacticAnalyzer:
         return Statement(getattr(stmt, 'id', None), get_nodes())
     
     def get_ast(self):
-        stmts = []
+        syntax_nodes = []
 
         while self.stmt_cursor < len(self.raw_stmts) - 1:
             self.next_statement()
-            stmts.append(self.get_statement(self.raw_stmts[self.stmt_cursor]))
+            syntax_nodes.append(self.get_statement(self.raw_stmts[self.stmt_cursor]))
             self.consume(EndOfLine)
         
-        return stmts
+        return syntax_nodes
 
-def parse():
-    stmts = get_raw_statements('formatted-cca.f')
+def build_ast(filename):
+    stmts = get_raw_statements(filename)
     ast = SyntacticAnalyzer(stmts).get_ast()
-    pass
-
-if __name__ == "__main__":
-    parse()
+    return ast

@@ -1,4 +1,4 @@
-from .parser import read_lines
+from utils.parser import read_lines
 
 
 def write_lines(filename, lines):
