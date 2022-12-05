@@ -1,29 +1,84 @@
 
-function INIT_ARR1(size)
-local a = {}
-for i=1,size do
-  a[i]=0
+-- http://lua-users.org/wiki/FileInputOutput
+
+-- see if the file exists
+function FILE_EXISTS(file)
+    local f = io.open(file, "rb")
+    if f then f:close() end
+    return f ~= nil
 end
-return a
-end
-function INIT_ARR2(size1, size2)
-local a = {}
-for i=1,size1 do
-    a[i] = {}
-    for j=1,size2 do
-    a[i][j]=0
+
+-- get all lines from a file, returns an empty
+-- list/table if the file does not exist
+function LINES_FROM(file)
+    if not FILE_EXISTS(file) then return {} end
+    local lines = {}
+    for line in io.lines(file) do
+        lines[#lines + 1] = line
     end
+    return lines
 end
-return a
+
+-- tests the functions above
+READ_LINES = LINES_FROM('formatted-cca.dat')
+
+function INIT_ARR1(size)
+    local a = {}
+    for i = 1, size do
+        a[i] = 0
+    end
+    return a
 end
+
+function INIT_ARR2(size1, size2)
+    local a = {}
+    for i = 1, size1 do
+        a[i] = {}
+        for j = 1, size2 do
+            a[i][j] = 0
+        end
+    end
+    return a
+end
+
 function READ_KEY()
+    local test = 1
 end
+
 function PAUSE(msg)
+    local test = 1
 end
-function FORTRAN_READ(type, units)
-    return {}
+
+READ_LINE_IDX = 1
+
+function FORTRAN_READ(types, units)
+    local line = READ_LINES[READ_LINE_IDX]
+    local result = {}
+    for i=1,#types,1 do
+        local t = types[i]
+        local u = units[i]
+        for j=1,u,1 do
+            if t == "G" then
+                local v = tonumber(string.sub(line, 1, 5))
+                if v == nil or v == '' then
+                    v = 0
+                end
+                table.insert(result, v)
+                line = string.sub(line, 6, #line)
+            elseif t == "A5" then
+                table.insert(result, string.sub(line, 1, 1))
+                line = string.sub(line, 2, #line)
+            else
+                error("Unsupported format type " .. t)
+            end
+        end
+    end
+    READ_LINE_IDX = READ_LINE_IDX + 1
+    return result
 end
+
 function FORTRAN_WRITE(value)
+    local test = 1
 end
 RTEXT = nil
 LLINE = nil
@@ -60,9 +115,7 @@ READ_KEY()
 TWOW=0
 local S=0
 B=A[1]
-::c00003::
 for J=1,4,1 do
-::c00004::
 for K=1,5,1 do
 local MASK1=68182605824
 local MASK=0
@@ -91,7 +144,9 @@ B=((B&-M2[K])|(17315143744&(-M2[K]~-1)))
 end
 ::l00002::
 goto c00004
+::c00004::
 end
+::c00003::
 end
 ::l00004::
 D=A[2]
@@ -130,7 +185,6 @@ goto l00030
 end
 ::l00010::
 IDIST=-DIST
-::c00005::
 for I=1,IDIST,1 do
 local J=0
 if ((RES<0)) then
@@ -138,11 +192,11 @@ J=17179869184
 end
 ::l00011::
 RES=(((RES&34359738367)/2)+J)
+::c00005::
 end
 ::l00020::
 if true then return {VAL,DIST,RES} end
 ::l00030::
-::c00006::
 for I=1,DIST,1 do
 J=0
 if (((RES&17179869184)~=0)) then
@@ -150,6 +204,7 @@ J=34359738368
 end
 ::l00031::
 RES=((RES&17179869183)*(2+J))
+::c00006::
 end
 if true then return {VAL,DIST,RES} end
 end
@@ -209,7 +264,6 @@ ASSIGN_VALUES00010 = {36,28,19,30,62,60,41,27,17,15,19,28,36,300,300}
 for I=1,15,1 do
 DTRAV[I]=ASSIGN_VALUES00010[I]
 end
-::c00011::
 for I=1,300,1 do
 STEXT[I]=0
 if ((I<=200)) then
@@ -220,13 +274,15 @@ RTEXT[I]=0
 end
 ::l01001::
 LTEXT[I]=0
+::c00011::
 end
 I=1
 ::l01002::
-READ_VALUES00012={FORTRAN_READ("G", 1)}
+READ_VALUES00012=FORTRAN_READ({"G"},{1})
 WRITE_I00013=1
 IKIND=READ_VALUES00012[WRITE_I00013]
 WRITE_I00013 = WRITE_I00013 + 1
+READ_LINE_IDX = READ_LINE_IDX + 1
 PLEX00014 = (IKIND+1)
 if (PLEX00014==1) then
 goto l01100
@@ -244,18 +300,17 @@ else
 goto l01004
 end
 ::l01004::
-READ_VALUES00015={FORTRAN_READ("G", 1),table.unpack(FORTRAN_READ("A5", 20))}
+READ_VALUES00015=FORTRAN_READ({"G","A5"},{1,20})
 WRITE_I00016=1
 JKIND=READ_VALUES00015[WRITE_I00016]
 WRITE_I00016 = WRITE_I00016 + 1
 for J=3,22,1 do
-LLINE[I][J]=READ_VALUES00015[J + WRITE_I00016]
-end
+LLINE[I][J]=READ_VALUES00015[WRITE_I00016]
 WRITE_I00016 = WRITE_I00016 + 1
+end
 if ((JKIND==-1)) then
 goto l01002
 end
-::c00017::
 for K=1,20,1 do
 KK=K
 if ((LLINE[I][(21-K)]~=" ")) then
@@ -263,6 +318,7 @@ goto l01007
 end
 ::l01006::
 goto c00017
+::c00017::
 end
 os.exit()
 ::l01007::
@@ -321,16 +377,16 @@ goto l01010
 ::l01013::
 I=1
 ::l01014::
-READ_VALUES00018={table.unpack(FORTRAN_READ("G", 12))}
+READ_VALUES00018=FORTRAN_READ({"G"},{12})
 WRITE_I00019=1
 JKIND=READ_VALUES00018[WRITE_I00019]
 WRITE_I00019 = WRITE_I00019 + 1
 LKIND=READ_VALUES00018[WRITE_I00019]
 WRITE_I00019 = WRITE_I00019 + 1
 for L=1,10,1 do
-TK[L]=READ_VALUES00018[L + WRITE_I00019]
-end
+TK[L]=READ_VALUES00018[WRITE_I00019]
 WRITE_I00019 = WRITE_I00019 + 1
+end
 if ((JKIND==-1)) then
 goto l01002
 end
@@ -342,7 +398,6 @@ goto l01017
 ::l01016::
 TRAVEL[(I-1)]=-TRAVEL[(I-1)]
 ::l01017::
-::c00020::
 for L=1,10,1 do
 if ((TK[L]==0)) then
 goto l01019
@@ -354,45 +409,47 @@ os.exit()
 end
 ::l01018::
 goto c00020
+::c00020::
 end
 ::l01019::
 TRAVEL[(I-1)]=-TRAVEL[(I-1)]
 goto l01014
 ::l01020::
-::c00021::
 for IU=1,1000,1 do
-READ_VALUES00022={FORTRAN_READ("G", 1),FORTRAN_READ("A5", 1)}
+READ_VALUES00022=FORTRAN_READ({"G","A5"},{1,1})
 WRITE_I00023=1
 KTAB[IU]=READ_VALUES00022[WRITE_I00023]
 WRITE_I00023 = WRITE_I00023 + 1
 ATAB[IU]=READ_VALUES00022[WRITE_I00023]
 WRITE_I00023 = WRITE_I00023 + 1
+READ_LINE_IDX = READ_LINE_IDX + 1
 if ((KTAB[IU]==-1)) then
 goto l01002
 end
 ::l01022::
 goto c00021
+::c00021::
 end
 PAUSE("TOO MANY WORDS")
 ::l01100::
-::c00024::
 for I=1,100,1 do
 IPLACE[I]=IPLT[I]
 IFIXED[I]=IFIXT[I]
 ::l01101::
 ICHAIN[I]=0
+::c00024::
 end
-::c00025::
 for I=1,300,1 do
 COND[I]=0
 ABB[I]=0
 ::l01102::
 IOBJ[I]=0
+::c00025::
 end
-::c00026::
 for I=1,10,1 do
 ::l01103::
 COND[I]=1
+::c00026::
 end
 COND[16]=2
 COND[20]=2
@@ -405,7 +462,6 @@ COND[26]=2
 COND[31]=2
 COND[32]=2
 COND[79]=2
-::c00027::
 for I=1,100,1 do
 KTEM=IPLACE[I]
 if ((KTEM==0)) then
@@ -429,6 +485,7 @@ KTEM=ICHAIN[KTEM]
 goto l01105
 ::l01107::
 goto c00027
+::c00027::
 end
 IDWARF=0
 IFIRST=1
@@ -442,7 +499,6 @@ _, _, _, YEA = table.unpack(YES(65,1,0,YEA))
 L=1
 LOC=1
 ::l00002::
-::c00028::
 for I=1,3,1 do
 if (((ODLOC[I]~=L)|(DSEEN[I]==0))) then
 goto l00073
@@ -452,6 +508,7 @@ _ = table.unpack(SPEAK(2))
 goto l00074
 ::l00073::
 goto c00028
+::c00028::
 end
 ::l00074::
 LOC=L
@@ -470,12 +527,12 @@ if ((math.random()>0.05)) then
 goto l00071
 end
 IDWARF=2
-::c00029::
 for I=1,3,1 do
 DLOC[I]=0
 ODLOC[I]=0
 ::l00061::
 DSEEN[I]=0
+::c00029::
 end
 _ = table.unpack(SPEAK(3))
 ICHAIN[AXE]=IOBJ[LOC]
@@ -487,7 +544,6 @@ IDWARF=(IDWARF+1)
 ATTACK=0
 DTOT=0
 STICK=0
-::c00030::
 for I=1,3,1 do
 if (((2*(I+IDWARF))<8)) then
 goto l00066
@@ -517,6 +573,7 @@ STICK=(STICK+1)
 end
 ::l00066::
 goto c00030
+::c00030::
 end
 if ((DTOT==0)) then
 goto l00071
@@ -906,7 +963,6 @@ goto l02023
 end
 _ = table.unpack(SPEAK(17))
 ::l02023::
-::c00033::
 for I=1,1000,1 do
 if ((KTAB[I]==-1)) then
 goto l03000
@@ -916,6 +972,7 @@ goto l02025
 end
 ::l02024::
 goto c00033
+::c00033::
 end
 PAUSE("ERROR 6")
 ::l02025::
@@ -1069,13 +1126,13 @@ PAUSE("OOPS")
 if (((IOBJ[J]==0)|(ICHAIN[IOBJ[J]]~=0))) then
 goto l05062
 end
-::c00037::
 for I=1,3,1 do
 if ((DSEEN[I]~=0)) then
 goto l05062
 end
 ::l05312::
 goto c00037
+::c00037::
 end
 JOBJ=IOBJ[J]
 goto l02027
@@ -1308,7 +1365,6 @@ end
 PROP[12]=1
 goto l02003
 ::l05300::
-::c00038::
 for ID=1,3,1 do
 IID=ID
 if ((DSEEN[ID]~=0)) then
@@ -1316,6 +1372,7 @@ goto l05307
 end
 ::l05313::
 goto c00038
+::c00038::
 end
 if ((JOBJ==0)) then
 goto l05062

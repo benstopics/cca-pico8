@@ -192,7 +192,6 @@ class Emitter:
     def emit_for_loop(self, forloop: ForLoop, continue_id=None):
         if continue_id is None:
             continue_id = self.get_unique_id()
-            self.output(f'::c{continue_id.zfill(5)}::\n')
         self.continue_id_stack.append(continue_id)
         self.output(f'for {forloop.counter_name}=')
         self.emit_expr(forloop.start_expr)
@@ -201,6 +200,7 @@ class Emitter:
         self.output(',1 do\n')
         for body_stmt in forloop.body_stmts:
             self.emit_statement(body_stmt)
+        self.output(f'::c{continue_id.zfill(5)}::\n')
         self.output('end\n')
         self.continue_id_stack.pop()
     
@@ -220,19 +220,12 @@ class Emitter:
         if call.args:
             self.output(')')
         self.output('\n')
-        
+
     def emit_read(self, read: ReadStatement):
         vname = f'READ_VALUES{self.get_unique_id()}'
-        self.output(f'{vname}=' + '{')
-        def outf(f):
-            units = f.units or 1
-            type = f.type or 'A5'
-            if units == 1:
-                return f'FORTRAN_READ("{type}", {units})'
-            else:
-                return f'table.unpack(FORTRAN_READ("{type}", {units}))'
-        self.output(','.join([outf(f) for f in read.formats]))
-        self.output('}\n')
+        types = ','.join([f'"{f.type}"' for f in read.formats])
+        units = ','.join([f'{f.units or 1}' for f in read.formats])
+        self.output(f'{vname}=FORTRAN_READ(' + '{' + types + '},{' + units + '})\n')
         iname = f'WRITE_I{self.get_unique_id()}'
         self.output(f'{iname}=1\n')
 
@@ -252,12 +245,14 @@ class Emitter:
                 self.emit_expr(mem_ref.stop_expr)
                 self.output(',1 do\n')
                 self.emit_memory_ref(mem_ref.array_loc_ref)
-                self.output(f'={vname}[{mem_ref.counter_name} + {iname}]\n')
-                self.output('end\n')
+                self.output(f'={vname}[{iname}]\n')
                 self.output(f'{iname} = {iname} + 1\n')
+                self.output('end\n')
                 return
             
             self.error(f'Reference not supported')
+        
+        self.output('READ_LINE_IDX = READ_LINE_IDX + 1\n')
     
     def emit_write(self, write: TypeStatement):
         if (
@@ -410,31 +405,86 @@ class Emitter:
 def export_cartridge(ast, datfilename):
     emitter = Emitter(ast, [datfilename], output='cca.lua')
     header = """
-function INIT_ARR1(size)
-local a = {}
-for i=1,size do
-  a[i]=0
+-- http://lua-users.org/wiki/FileInputOutput
+
+-- see if the file exists
+function FILE_EXISTS(file)
+    local f = io.open(file, "rb")
+    if f then f:close() end
+    return f ~= nil
 end
-return a
-end
-function INIT_ARR2(size1, size2)
-local a = {}
-for i=1,size1 do
-    a[i] = {}
-    for j=1,size2 do
-    a[i][j]=0
+
+-- get all lines from a file, returns an empty
+-- list/table if the file does not exist
+function LINES_FROM(file)
+    if not FILE_EXISTS(file) then return {} end
+    local lines = {}
+    for line in io.lines(file) do
+        lines[#lines + 1] = line
     end
+    return lines
 end
-return a
+
+-- tests the functions above
+READ_LINES = LINES_FROM('formatted-cca.dat')
+
+function INIT_ARR1(size)
+    local a = {}
+    for i = 1, size do
+        a[i] = 0
+    end
+    return a
 end
+
+function INIT_ARR2(size1, size2)
+    local a = {}
+    for i = 1, size1 do
+        a[i] = {}
+        for j = 1, size2 do
+            a[i][j] = 0
+        end
+    end
+    return a
+end
+
 function READ_KEY()
+    local test = 1
 end
+
 function PAUSE(msg)
+    local test = 1
 end
-function FORTRAN_READ(type, units)
-    return {}
+
+READ_LINE_IDX = 1
+
+function FORTRAN_READ(types, units)
+    local line = READ_LINES[READ_LINE_IDX]
+    local result = {}
+    for i=1,#types,1 do
+        local t = types[i]
+        local u = units[i]
+        for j=1,u,1 do
+            if t == "G" then
+                local v = tonumber(string.sub(line, 1, 5))
+                if v == nil or v == '' then
+                    v = 0
+                end
+                table.insert(result, v)
+                line = string.sub(line, 6, #line)
+            elseif t == "A5" then
+                table.insert(result, string.sub(line, 1, 1))
+                line = string.sub(line, 2, #line)
+            else
+                error("Unsupported format type " .. t)
+            end
+        end
+    end
+    READ_LINE_IDX = READ_LINE_IDX + 1
+    return result
 end
+
 function FORTRAN_WRITE(value)
+    local test = 1
 end
 """
     lua = emitter.emit_lua(header)
