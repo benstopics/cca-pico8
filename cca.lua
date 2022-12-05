@@ -25,12 +25,14 @@ function FORTRAN_READ(type, units)
 end
 function FORTRAN_WRITE(value)
 end
+RTEXT = nil
+LLINE = nil
 function SPEAK(IT)
- RTEXT = INIT_ARR1(100)
- LLINE = INIT_ARR2(1000,22)
-KKT=RTEXT[IT]
+local RTEXT = INIT_ARR1(100)
+local LLINE = INIT_ARR2(1000,22)
+local KKT=RTEXT[IT]
 if ((KKT==0)) then
-if true then return end
+if true then return {IT} end
 end
 ::l00999::
 for JJT=3,LLINE[KKT][2],1 do
@@ -42,24 +44,28 @@ goto l00999
 end
 ::l00997::
 FORTRAN_WRITE("\n")
-if true then return end
+if true then return {IT} end
 end
 function GETIN(TWOW,B,C,D)
- A = INIT_ARR1(5)
- M2 = INIT_ARR1(6)
- assign_values00001 = {536870912,4194304,32768,256,2,0}
-for assign_i00002=1,6,1 do
-M2=assign_values00001[assign_i00002]
+local A = INIT_ARR1(5)
+local M2 = INIT_ARR1(6)
+local XX=0
+local YY=0
+ASSIGN_VALUES00001 = {536870912,4194304,32768,256,2,0}
+for ASSIGN_I00002=1,6,1 do
+M2=ASSIGN_VALUES00001[ASSIGN_I00002]
 end
 ::l00006::
-READ_KEY()TWOW=0
-S=0
+READ_KEY()
+TWOW=0
+local S=0
 B=A[1]
 ::c00003::
 for J=1,4,1 do
 ::c00004::
 for K=1,5,1 do
-MASK1=68182605824
+local MASK1=68182605824
+local MASK=0
 if ((K~=1)) then
 MASK1=(127*M2[K])
 end
@@ -70,8 +76,8 @@ if ((S==0)) then
 goto l00002
 end
 TWOW=1
-SHIFT(A[J],(7*(K-1)),XX)
-SHIFT(A[(J+1)],(7*(K-6)),YY)
+A, _, XX = table.unpack(SHIFT(A[J],(7*(K-1)),XX))
+A, _, YY = table.unpack(SHIFT(A[(J+1)],(7*(K-6)),YY))
 MASK=-M2[(6-K)]
 C=((XX&MASK)+(YY&(-2-MASK)))
 goto l00004
@@ -89,28 +95,32 @@ end
 end
 ::l00004::
 D=A[2]
-if true then return end
+if true then return {TWOW,B,C,D} end
 end
 function YES(X,Y,Z,YEA)
-SPEAK(X)
-GETIN(JUNK,IA1,JUNK,IB1)
+X = table.unpack(SPEAK(X))
+local JUNK=0
+local IA1=0
+local IB1=0
+JUNK, IA1, JUNK, IB1 = table.unpack(GETIN(JUNK,IA1,JUNK,IB1))
 if (((IA1=="NO")|(IA1=="N"))) then
 goto l00001
 end
 YEA=1
 if ((Y~=0)) then
-SPEAK(Y)
+Y = table.unpack(SPEAK(Y))
 end
-if true then return end
+if true then return {X,Y,Z,YEA} end
 ::l00001::
 YEA=0
 if ((Z~=0)) then
-SPEAK(Z)
+Z = table.unpack(SPEAK(Z))
 end
-if true then return end
+if true then return {X,Y,Z,YEA} end
 end
 function SHIFT(VAL,DIST,RES)
 RES=VAL
+local IDIST=0
 if (DIST<0) then
 goto l00010
 elseif (DIST==0) then
@@ -122,7 +132,7 @@ end
 IDIST=-DIST
 ::c00005::
 for I=1,IDIST,1 do
-J=0
+local J=0
 if ((RES<0)) then
 J=17179869184
 end
@@ -130,7 +140,7 @@ end
 RES=(((RES&34359738367)/2)+J)
 end
 ::l00020::
-if true then return end
+if true then return {VAL,DIST,RES} end
 ::l00030::
 ::c00006::
 for I=1,DIST,1 do
@@ -141,33 +151,34 @@ end
 ::l00031::
 RES=((RES&17179869183)*(2+J))
 end
-if true then return end
+if true then return {VAL,DIST,RES} end
 end
- IOBJ = INIT_ARR1(300)
- ICHAIN = INIT_ARR1(100)
- IPLACE = INIT_ARR1(100)
- IFIXED = INIT_ARR1(100)
- COND = INIT_ARR1(300)
- PROP = INIT_ARR1(100)
- ABB = INIT_ARR1(300)
- LLINE = INIT_ARR2(1000,22)
- LTEXT = INIT_ARR1(300)
- STEXT = INIT_ARR1(300)
- KEY = INIT_ARR1(300)
- DEFAULT = INIT_ARR1(300)
- TRAVEL = INIT_ARR1(1000)
- TK = INIT_ARR1(25)
- KTAB = INIT_ARR1(1000)
- ATAB = INIT_ARR1(1000)
- BTEXT = INIT_ARR1(200)
- DSEEN = INIT_ARR1(10)
- DLOC = INIT_ARR1(10)
- ODLOC = INIT_ARR1(10)
- DTRAV = INIT_ARR1(20)
- RTEXT = INIT_ARR1(100)
- JSPKT = INIT_ARR1(100)
- IPLT = INIT_ARR1(100)
- IFIXT = INIT_ARR1(100)
+SETUP=0
+IOBJ = INIT_ARR1(300)
+ICHAIN = INIT_ARR1(100)
+IPLACE = INIT_ARR1(100)
+IFIXED = INIT_ARR1(100)
+COND = INIT_ARR1(300)
+PROP = INIT_ARR1(100)
+ABB = INIT_ARR1(300)
+LLINE = INIT_ARR2(1000,22)
+LTEXT = INIT_ARR1(300)
+STEXT = INIT_ARR1(300)
+KEY = INIT_ARR1(300)
+DEFAULT = INIT_ARR1(300)
+TRAVEL = INIT_ARR1(1000)
+TK = INIT_ARR1(25)
+KTAB = INIT_ARR1(1000)
+ATAB = INIT_ARR1(1000)
+BTEXT = INIT_ARR1(200)
+DSEEN = INIT_ARR1(10)
+DLOC = INIT_ARR1(10)
+ODLOC = INIT_ARR1(10)
+DTRAV = INIT_ARR1(20)
+RTEXT = INIT_ARR1(100)
+JSPKT = INIT_ARR1(100)
+IPLT = INIT_ARR1(100)
+IFIXT = INIT_ARR1(100)
 if ((SETUP~=0)) then
 goto l00001
 end
@@ -182,21 +193,21 @@ SNAKE=11
 FOOD=19
 WATER=20
 AXE=21
- assign_values00007 = {24,29,0,31,0,31,38,38,42,42,43,46,77,71,73,75}
+ASSIGN_VALUES00007 = {24,29,0,31,0,31,38,38,42,42,43,46,77,71,73,75}
 for I=1,16,1 do
-JSPKT[I]=assign_values00007[I]
+JSPKT[I]=ASSIGN_VALUES00007[I]
 end
- assign_values00008 = {3,3,8,10,11,14,13,9,15,18,19,17,27,28,29,30,0,0,3,3}
+ASSIGN_VALUES00008 = {3,3,8,10,11,14,13,9,15,18,19,17,27,28,29,30,0,0,3,3}
 for I=1,20,1 do
-IPLT[I]=assign_values00008[I]
+IPLT[I]=ASSIGN_VALUES00008[I]
 end
- assign_values00009 = {0,0,1,0,0,1,0,1,1,0,1,1,0,0,0,0,0,0,0,0}
+ASSIGN_VALUES00009 = {0,0,1,0,0,1,0,1,1,0,1,1,0,0,0,0,0,0,0,0}
 for I=1,20,1 do
-IFIXT[I]=assign_values00009[I]
+IFIXT[I]=ASSIGN_VALUES00009[I]
 end
- assign_values00010 = {36,28,19,30,62,60,41,27,17,15,19,28,36,300,300}
+ASSIGN_VALUES00010 = {36,28,19,30,62,60,41,27,17,15,19,28,36,300,300}
 for I=1,15,1 do
-DTRAV[I]=assign_values00010[I]
+DTRAV[I]=ASSIGN_VALUES00010[I]
 end
 ::c00011::
 for I=1,300,1 do
@@ -212,35 +223,35 @@ LTEXT[I]=0
 end
 I=1
 ::l01002::
- read_values00012={FORTRAN_READ("G", 1)}
- write_i00013=1
-IKIND=read_values00012[write_i00013]
-write_i00013 = write_i00013 + 1
- plex00014 = (IKIND+1)
-if (plex00014==1) then
+READ_VALUES00012={FORTRAN_READ("G", 1)}
+WRITE_I00013=1
+IKIND=READ_VALUES00012[WRITE_I00013]
+WRITE_I00013 = WRITE_I00013 + 1
+PLEX00014 = (IKIND+1)
+if (PLEX00014==1) then
 goto l01100
-elseif (plex00014==2) then
+elseif (PLEX00014==2) then
 goto l01004
-elseif (plex00014==3) then
+elseif (PLEX00014==3) then
 goto l01004
-elseif (plex00014==4) then
+elseif (PLEX00014==4) then
 goto l01013
-elseif (plex00014==5) then
+elseif (PLEX00014==5) then
 goto l01020
-elseif (plex00014==6) then
+elseif (PLEX00014==6) then
 goto l01004
 else
 goto l01004
 end
 ::l01004::
- read_values00015={FORTRAN_READ("G", 1),table.unpack(FORTRAN_READ("A5", 20))}
- write_i00016=1
-JKIND=read_values00015[write_i00016]
-write_i00016 = write_i00016 + 1
+READ_VALUES00015={FORTRAN_READ("G", 1),table.unpack(FORTRAN_READ("A5", 20))}
+WRITE_I00016=1
+JKIND=READ_VALUES00015[WRITE_I00016]
+WRITE_I00016 = WRITE_I00016 + 1
 for J=3,22,1 do
-LLINE[I][J]=read_values00015[J + write_i00016]
+LLINE[I][J]=READ_VALUES00015[J + WRITE_I00016]
 end
-write_i00016 = write_i00016 + 1
+WRITE_I00016 = WRITE_I00016 + 1
 if ((JKIND==-1)) then
 goto l01002
 end
@@ -310,16 +321,16 @@ goto l01010
 ::l01013::
 I=1
 ::l01014::
- read_values00018={table.unpack(FORTRAN_READ("G", 12))}
- write_i00019=1
-JKIND=read_values00018[write_i00019]
-write_i00019 = write_i00019 + 1
-LKIND=read_values00018[write_i00019]
-write_i00019 = write_i00019 + 1
+READ_VALUES00018={table.unpack(FORTRAN_READ("G", 12))}
+WRITE_I00019=1
+JKIND=READ_VALUES00018[WRITE_I00019]
+WRITE_I00019 = WRITE_I00019 + 1
+LKIND=READ_VALUES00018[WRITE_I00019]
+WRITE_I00019 = WRITE_I00019 + 1
 for L=1,10,1 do
-TK[L]=read_values00018[L + write_i00019]
+TK[L]=READ_VALUES00018[L + WRITE_I00019]
 end
-write_i00019 = write_i00019 + 1
+WRITE_I00019 = WRITE_I00019 + 1
 if ((JKIND==-1)) then
 goto l01002
 end
@@ -350,12 +361,12 @@ goto l01014
 ::l01020::
 ::c00021::
 for IU=1,1000,1 do
- read_values00022={FORTRAN_READ("G", 1),FORTRAN_READ("A5", 1)}
- write_i00023=1
-KTAB[IU]=read_values00022[write_i00023]
-write_i00023 = write_i00023 + 1
-ATAB[IU]=read_values00022[write_i00023]
-write_i00023 = write_i00023 + 1
+READ_VALUES00022={FORTRAN_READ("G", 1),FORTRAN_READ("A5", 1)}
+WRITE_I00023=1
+KTAB[IU]=READ_VALUES00022[WRITE_I00023]
+WRITE_I00023 = WRITE_I00023 + 1
+ATAB[IU]=READ_VALUES00022[WRITE_I00023]
+WRITE_I00023 = WRITE_I00023 + 1
 if ((KTAB[IU]==-1)) then
 goto l01002
 end
@@ -426,7 +437,8 @@ ILONG=1
 IDETAL=0
 PAUSE("INIT DONE")
 ::l00001::
-YES(65,1,0,YEA)
+YEA=0
+_, _, _, YEA = table.unpack(YES(65,1,0,YEA))
 L=1
 LOC=1
 ::l00002::
@@ -436,7 +448,7 @@ if (((ODLOC[I]~=L)|(DSEEN[I]==0))) then
 goto l00073
 end
 L=LOC
-SPEAK(2)
+_ = table.unpack(SPEAK(2))
 goto l00074
 ::l00073::
 goto c00028
@@ -465,7 +477,7 @@ ODLOC[I]=0
 ::l00061::
 DSEEN[I]=0
 end
-SPEAK(3)
+_ = table.unpack(SPEAK(3))
 ICHAIN[AXE]=IOBJ[LOC]
 IOBJ[LOC]=AXE
 IPLACE[AXE]=LOC
@@ -518,7 +530,7 @@ FORTRAN_WRITE(" THREATENING LITTLE DWARVES IN THE ROOM WITH YOU.")
 FORTRAN_WRITE("\n")
 goto l00077
 ::l00075::
-SPEAK(4)
+_ = table.unpack(SPEAK(4))
 ::l00077::
 if ((ATTACK==0)) then
 goto l00071
@@ -532,10 +544,10 @@ FORTRAN_WRITE(" OF THEM THROW KNIVES AT YOU!")
 FORTRAN_WRITE("\n")
 goto l00081
 ::l00079::
-SPEAK(5)
-SPEAK((52+STICK))
- plex00031 = (STICK+1)
-if (plex00031==1) then
+_ = table.unpack(SPEAK(5))
+_ = table.unpack(SPEAK((52+STICK)))
+PLEX00031 = (STICK+1)
+if (PLEX00031==1) then
 goto l00071
 else
 goto l00083
@@ -553,12 +565,12 @@ FORTRAN_WRITE(" OF THEM GET YOU.")
 FORTRAN_WRITE("\n")
 goto l00083
 ::l00082::
-SPEAK(6)
+_ = table.unpack(SPEAK(6))
 ::l00083::
 PAUSE("GAMES OVER")
 goto l00071
 ::l00069::
-SPEAK(7)
+_ = table.unpack(SPEAK(7))
 ::l00071::
 KK=STEXT[L]
 if (((ABB[L]==0)|(KK==0))) then
@@ -581,7 +593,7 @@ if ((COND[L]==2)) then
 goto l00008
 end
 if (((LOC==33)&(math.random()<0.25))) then
-SPEAK(8)
+_ = table.unpack(SPEAK(8))
 end
 J=L
 goto l02000
@@ -647,45 +659,46 @@ end
 if ((K==17)) then
 JSPK=80
 end
-SPEAK(JSPK)
+JSPK=0
+JSPK = table.unpack(SPEAK(JSPK))
 goto l00002
 ::l00019::
-SPEAK(13)
+_ = table.unpack(SPEAK(13))
 L=LOC
 if ((IFIRST==0)) then
-SPEAK(14)
+_ = table.unpack(SPEAK(14))
 end
 ::l00021::
 if ((L<300)) then
 goto l00002
 end
 IL=((L-300)+1)
- plex00032 = IL
-if (plex00032==1) then
+PLEX00032 = IL
+if (PLEX00032==1) then
 goto l00022
-elseif (plex00032==2) then
+elseif (PLEX00032==2) then
 goto l00023
-elseif (plex00032==3) then
+elseif (PLEX00032==3) then
 goto l00024
-elseif (plex00032==4) then
+elseif (PLEX00032==4) then
 goto l00025
-elseif (plex00032==5) then
+elseif (PLEX00032==5) then
 goto l00026
-elseif (plex00032==6) then
+elseif (PLEX00032==6) then
 goto l00031
-elseif (plex00032==7) then
+elseif (PLEX00032==7) then
 goto l00027
-elseif (plex00032==8) then
+elseif (PLEX00032==8) then
 goto l00028
-elseif (plex00032==9) then
+elseif (PLEX00032==9) then
 goto l00029
-elseif (plex00032==10) then
+elseif (PLEX00032==10) then
 goto l00030
-elseif (plex00032==11) then
+elseif (PLEX00032==11) then
 goto l00033
-elseif (plex00032==12) then
+elseif (PLEX00032==12) then
 goto l00034
-elseif (plex00032==13) then
+elseif (PLEX00032==13) then
 goto l00036
 else
 goto l00037
@@ -750,7 +763,7 @@ PAUSE("GAME IS OVER")
 goto l01100
 ::l00032::
 if ((IDETAL<3)) then
-SPEAK(15)
+_ = table.unpack(SPEAK(15))
 end
 IDETAL=(IDETAL+1)
 L=LOC
@@ -771,7 +784,7 @@ goto l00002
 ::l00035::
 L=65
 ::l00038::
-SPEAK(56)
+_ = table.unpack(SPEAK(56))
 goto l00002
 ::l00036::
 if ((math.random()>0.2)) then
@@ -801,10 +814,10 @@ L=77
 goto l00002
 ::l00040::
 if ((LOC<8)) then
-SPEAK(57)
+_ = table.unpack(SPEAK(57))
 end
 if ((LOC>=8)) then
-SPEAK(58)
+_ = table.unpack(SPEAK(58))
 end
 L=LOC
 goto l00002
@@ -823,7 +836,7 @@ if ((PROP[2]==1)) then
 goto l02003
 end
 ::l02001::
-SPEAK(16)
+_ = table.unpack(SPEAK(16))
 IDARK=1
 ::l02003::
 I=IOBJ[J]
@@ -864,13 +877,18 @@ K=54
 ::l02010::
 JSPK=K
 ::l05200::
-SPEAK(JSPK)
+JSPK=0
+JSPK = table.unpack(SPEAK(JSPK))
 ::l02011::
 JVERB=0
 JOBJ=0
 TWOWDS=0
 ::l02020::
-GETIN(TWOWDS,A,WD2,B)
+TWOWDS=0
+A=0
+WD2=0
+B=0
+TWOWDS, A, WD2, B = table.unpack(GETIN(TWOWDS,A,WD2,B))
 K=70
 if (((A=="ENTER")&((WD2=="STREA")|(WD2=="WATER")))) then
 goto l02010
@@ -886,7 +904,7 @@ IWEST=(IWEST+1)
 if ((IWEST~=10)) then
 goto l02023
 end
-SPEAK(17)
+_ = table.unpack(SPEAK(17))
 ::l02023::
 ::c00033::
 for I=1,1000,1 do
@@ -903,12 +921,12 @@ PAUSE("ERROR 6")
 ::l02025::
 K=(KTAB[I]%1000)
 KQ=(KTAB[I]/(1000+1))
- plex00034 = KQ
-if (plex00034==1) then
+PLEX00034 = KQ
+if (PLEX00034==1) then
 goto l05014
-elseif (plex00034==2) then
+elseif (PLEX00034==2) then
 goto l05000
-elseif (plex00034==3) then
+elseif (PLEX00034==3) then
 goto l02026
 else
 goto l02010
@@ -924,36 +942,36 @@ if ((JOBJ==0)) then
 goto l02036
 end
 ::l02027::
- plex00035 = JVERB
-if (plex00035==1) then
+PLEX00035 = JVERB
+if (PLEX00035==1) then
 goto l09000
-elseif (plex00035==2) then
+elseif (PLEX00035==2) then
 goto l05066
-elseif (plex00035==3) then
+elseif (PLEX00035==3) then
 goto l03000
-elseif (plex00035==4) then
+elseif (PLEX00035==4) then
 goto l05031
-elseif (plex00035==5) then
+elseif (PLEX00035==5) then
 goto l02009
-elseif (plex00035==6) then
+elseif (PLEX00035==6) then
 goto l05031
-elseif (plex00035==7) then
+elseif (PLEX00035==7) then
 goto l09404
-elseif (plex00035==8) then
+elseif (PLEX00035==8) then
 goto l09406
-elseif (plex00035==9) then
+elseif (PLEX00035==9) then
 goto l05081
-elseif (plex00035==10) then
+elseif (PLEX00035==10) then
 goto l05200
-elseif (plex00035==11) then
+elseif (PLEX00035==11) then
 goto l05200
-elseif (plex00035==12) then
+elseif (PLEX00035==12) then
 goto l05300
-elseif (plex00035==13) then
+elseif (PLEX00035==13) then
 goto l05506
-elseif (plex00035==14) then
+elseif (PLEX00035==14) then
 goto l05502
-elseif (plex00035==15) then
+elseif (PLEX00035==15) then
 goto l05504
 else
 goto l05505
@@ -972,7 +990,8 @@ end
 if ((math.random()>0.8)) then
 JSPK=13
 end
-SPEAK(JSPK)
+JSPK=0
+JSPK = table.unpack(SPEAK(JSPK))
 LTRUBL=(LTRUBL+1)
 if ((LTRUBL~=3)) then
 goto l02020
@@ -980,19 +999,22 @@ end
 if (((J~=13)|((IPLACE[7]~=13)|(IPLACE[5]~=-1)))) then
 goto l02032
 end
-YES(18,19,54,YEA)
+YEA=0
+_, _, _, YEA = table.unpack(YES(18,19,54,YEA))
 goto l02033
 ::l02032::
 if (((J~=19)|((PROP[11]~=0)|(IPLACE[7]==-1)))) then
 goto l02034
 end
-YES(20,21,54,YEA)
+YEA=0
+_, _, _, YEA = table.unpack(YES(20,21,54,YEA))
 goto l02033
 ::l02034::
 if (((J~=8)|(PROP[GRATE]~=0))) then
 goto l02035
 end
-YES(62,63,54,YEA)
+YEA=0
+_, _, _, YEA = table.unpack(YES(62,63,54,YEA))
 ::l02033::
 if ((YEA==0)) then
 goto l02011
@@ -1005,39 +1027,39 @@ end
 if ((JOBJ~=5)) then
 goto l02020
 end
-SPEAK(22)
+_ = table.unpack(SPEAK(22))
 goto l02020
 ::l02036::
- plex00036 = JVERB
-if (plex00036==1) then
+PLEX00036 = JVERB
+if (PLEX00036==1) then
 goto l02037
-elseif (plex00036==2) then
+elseif (PLEX00036==2) then
 goto l05062
-elseif (plex00036==3) then
+elseif (PLEX00036==3) then
 goto l05062
-elseif (plex00036==4) then
+elseif (PLEX00036==4) then
 goto l09403
-elseif (plex00036==5) then
+elseif (PLEX00036==5) then
 goto l02009
-elseif (plex00036==6) then
+elseif (PLEX00036==6) then
 goto l09403
-elseif (plex00036==7) then
+elseif (PLEX00036==7) then
 goto l09404
-elseif (plex00036==8) then
+elseif (PLEX00036==8) then
 goto l09406
-elseif (plex00036==9) then
+elseif (PLEX00036==9) then
 goto l05062
-elseif (plex00036==10) then
+elseif (PLEX00036==10) then
 goto l05062
-elseif (plex00036==11) then
+elseif (PLEX00036==11) then
 goto l05200
-elseif (plex00036==12) then
+elseif (PLEX00036==12) then
 goto l05300
-elseif (plex00036==13) then
+elseif (PLEX00036==13) then
 goto l05062
-elseif (plex00036==14) then
+elseif (PLEX00036==14) then
 goto l05062
-elseif (plex00036==15) then
+elseif (PLEX00036==15) then
 goto l05062
 else
 goto l05062
@@ -1080,7 +1102,7 @@ if ((math.random()>0.25)) then
 goto l00008
 end
 ::l05017::
-SPEAK(23)
+_ = table.unpack(SPEAK(23))
 PAUSE("GAME IS OVER")
 goto l02011
 ::l05000::
@@ -1151,7 +1173,7 @@ end
 if ((IFIXED[JOBJ]==0)) then
 goto l09002
 end
-SPEAK(25)
+_ = table.unpack(SPEAK(25))
 goto l02011
 ::l09002::
 if ((JOBJ~=BIRD)) then
@@ -1160,13 +1182,13 @@ end
 if ((IPLACE[ROD]~=-1)) then
 goto l09003
 end
-SPEAK(26)
+_ = table.unpack(SPEAK(26))
 goto l02011
 ::l09003::
 if (((IPLACE[4]==-1)|(IPLACE[4]==J))) then
 goto l09004
 end
-SPEAK(27)
+_ = table.unpack(SPEAK(27))
 goto l02011
 ::l09004::
 IPLACE[JOBJ]=-1
@@ -1192,7 +1214,7 @@ if (((J==8)|(J==9))) then
 goto l05105
 end
 ::l05032::
-SPEAK(28)
+_ = table.unpack(SPEAK(28))
 goto l02011
 ::l05105::
 JOBJ=GRATE
@@ -1208,7 +1230,7 @@ end
 if (((JOBJ~=BIRD)|((J~=19)|(PROP[11]==1)))) then
 goto l09401
 end
-SPEAK(30)
+_ = table.unpack(SPEAK(30))
 PROP[11]=1
 ::l05160::
 ICHAIN[JOBJ]=IOBJ[J]
@@ -1216,7 +1238,7 @@ IOBJ[J]=JOBJ
 IPLACE[JOBJ]=J
 goto l02011
 ::l09401::
-SPEAK(54)
+_ = table.unpack(SPEAK(54))
 goto l05160
 ::l05031::
 if (((IPLACE[KEYS]~=-1)&(IPLACE[KEYS]~=J))) then
@@ -1225,19 +1247,19 @@ end
 if ((JOBJ~=4)) then
 goto l05102
 end
-SPEAK(32)
+_ = table.unpack(SPEAK(32))
 goto l02011
 ::l05102::
 if ((JOBJ~=KEYS)) then
 goto l05104
 end
-SPEAK(55)
+_ = table.unpack(SPEAK(55))
 goto l02011
 ::l05104::
 if ((JOBJ==GRATE)) then
 goto l05107
 end
-SPEAK(33)
+_ = table.unpack(SPEAK(33))
 goto l02011
 ::l05107::
 if ((JVERB==4)) then
@@ -1246,10 +1268,10 @@ end
 if ((PROP[GRATE]~=0)) then
 goto l05034
 end
-SPEAK(34)
+_ = table.unpack(SPEAK(34))
 goto l02011
 ::l05034::
-SPEAK(35)
+_ = table.unpack(SPEAK(35))
 PROP[GRATE]=0
 PROP[8]=0
 goto l02011
@@ -1257,10 +1279,10 @@ goto l02011
 if ((PROP[GRATE]==0)) then
 goto l05109
 end
-SPEAK(36)
+_ = table.unpack(SPEAK(36))
 goto l02011
 ::l05109::
-SPEAK(37)
+_ = table.unpack(SPEAK(37))
 PROP[GRATE]=1
 PROP[8]=1
 goto l02011
@@ -1270,14 +1292,14 @@ goto l05200
 end
 PROP[2]=1
 IDARK=0
-SPEAK(39)
+_ = table.unpack(SPEAK(39))
 goto l02011
 ::l09406::
 if (((IPLACE[2]~=J)&(IPLACE[2]~=-1))) then
 goto l05200
 end
 PROP[2]=0
-SPEAK(40)
+_ = table.unpack(SPEAK(40))
 goto l02011
 ::l05081::
 if ((JOBJ~=12)) then
@@ -1304,10 +1326,10 @@ end
 if ((JOBJ==BIRD)) then
 goto l05302
 end
-SPEAK(44)
+_ = table.unpack(SPEAK(44))
 goto l02011
 ::l05302::
-SPEAK(45)
+_ = table.unpack(SPEAK(45))
 IPLACE[JOBJ]=300
 goto l09005
 ::l05307::
@@ -1317,10 +1339,10 @@ end
 DSEEN[IID]=0
 ODLOC[IID]=0
 DLOC[IID]=0
-SPEAK(47)
+_ = table.unpack(SPEAK(47))
 goto l05311
 ::l05309::
-SPEAK(48)
+_ = table.unpack(SPEAK(48))
 ::l05311::
 K=21
 goto l05014

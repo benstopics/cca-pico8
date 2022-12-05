@@ -1,7 +1,7 @@
 from utils.parser.models import *
 import os
 
-LOCAL_KEYWORD = ''
+LOCAL_KEYWORD = 'local'
 
 logical_ops = {
     'AND': '&',
@@ -26,11 +26,23 @@ class Emitter:
         self.output_buffer = ''
         self.unique_id = 0
         self.global_vars = []
+        self.symbol_stack = [[]]
         self.continue_id_stack = []
         self.subroutine = False
+        self.subroutine_args = []
 
         if output and os.path.isfile(output):
             os.remove(output)
+    
+    def symbol_known(self, symbol):
+        for scope in self.symbol_stack:
+            for s in scope:
+                if s == symbol: return True
+        
+        return False
+    
+    def add_symbol(self, symbol):
+        self.symbol_stack[-1].append(symbol)
     
     def get_unique_id(self):
         self.unique_id += 1
@@ -112,8 +124,8 @@ class Emitter:
             self.output(f'goto l{str(goto.stmt_ids[0]).zfill(5)}\n')
             return
         
-        mname = f'plex{self.get_unique_id()}'
-        self.output(f'{LOCAL_KEYWORD} {mname} = ')
+        mname = f'PLEX{self.get_unique_id()}'
+        self.output(f'{mname} = ')
         self.emit_expr(goto.multiplexer_expr)
         self.output('\n')
         for i in range(len(goto.stmt_ids)):
@@ -143,14 +155,17 @@ class Emitter:
         raise Exception('Invalid reference')
     
     def emit_assignment(self, assign: Assignment):
+        if self.subroutine and not self.symbol_known(assign.memory_ref.name):
+            self.add_symbol(assign.memory_ref.name)
+            self.output(f'{LOCAL_KEYWORD} ')
         self.emit_memory_ref(assign.memory_ref)
         self.output('=')
         self.emit_expr(assign.value_expr)
         self.output('\n')
     
     def emit_array_assignment(self, arr_assign: ArrayAssignment):
-        vname = f'assign_values{self.get_unique_id()}'
-        self.output(f'{LOCAL_KEYWORD} {vname} = ' + '{')
+        vname = f'ASSIGN_VALUES{self.get_unique_id()}'
+        self.output(f'{vname} = ' + '{')
         self.output(','.join([Emitter().emit_expr(v).output_buffer for v in arr_assign.value_exprs]))
         self.output('}\n')
         
@@ -166,7 +181,7 @@ class Emitter:
             return
         
         if isinstance(arr_assign.loc_ref, VariableRef):
-            iname = f'assign_i{self.get_unique_id()}'
+            iname = f'ASSIGN_I{self.get_unique_id()}'
             self.output(f'for {iname}=1,{len(arr_assign.value_exprs)},1 do\n')
             self.output(f'{arr_assign.loc_ref.name}={vname}[{iname}]\n')
             self.output('end\n')
@@ -192,12 +207,23 @@ class Emitter:
     def emit_call(self, call: CallSubroutine):
         if call.name == 'IFILE': return
 
+        for arg in call.args:
+            if isinstance(arg, VariableRef) and not self.symbol_known(arg.name):
+                self.emit_assignment(Assignment(VariableRef(arg.name), 0))
+        
+        if call.args:
+            self.output(', '.join([a.name if getattr(a, 'name', None) else '_' for a in call.args]))
+            self.output(' = ')
+            self.output('table.unpack(')
         self.output(call.name)
-        self.output(f'({",".join([Emitter().emit_expr(a).output_buffer for a in call.args])})\n')
-    
+        self.output(f'({",".join([Emitter().emit_expr(a).output_buffer for a in call.args])})')
+        if call.args:
+            self.output(')')
+        self.output('\n')
+        
     def emit_read(self, read: ReadStatement):
-        vname = f'read_values{self.get_unique_id()}'
-        self.output(f'{LOCAL_KEYWORD} {vname}=' + '{')
+        vname = f'READ_VALUES{self.get_unique_id()}'
+        self.output(f'{vname}=' + '{')
         def outf(f):
             units = f.units or 1
             type = f.type or 'A5'
@@ -207,8 +233,8 @@ class Emitter:
                 return f'table.unpack(FORTRAN_READ("{type}", {units}))'
         self.output(','.join([outf(f) for f in read.formats]))
         self.output('}\n')
-        iname = f'write_i{self.get_unique_id()}'
-        self.output(f'{LOCAL_KEYWORD} {iname}=1\n')
+        iname = f'WRITE_I{self.get_unique_id()}'
+        self.output(f'{iname}=1\n')
 
         for mem_ref in read.memory_refs:
             if (
@@ -275,16 +301,21 @@ class Emitter:
     def emit_subroutine(self, fn: Subroutine):
         self.subroutine = True
         self.output(f'function {fn.name}({",".join(fn.params)})\n')
+        self.subroutine_args = [*fn.params]
+        self.symbol_stack.append(fn.params)
         for body_stmt in fn.body_stmts:
             self.emit_statement(body_stmt, ignore=[GlobalVarDef])
         self.output('end\n')
         self.subroutine = False
+        self.symbol_stack.pop()
         pass
     
     def emit_array_def(self, array_def: ArrayDef):
-        if self.subroutine and array_def.name in self.global_vars: return
-
-        self.output(f'{"" if array_def.name in self.global_vars else f"{LOCAL_KEYWORD} "}{array_def.name}' + ' = ')
+        if self.subroutine:
+            if array_def.name in self.global_vars: return
+            else: self.output(f'{LOCAL_KEYWORD} ')
+        
+        self.output(f'{array_def.name} = ')
 
         if len(array_def.dims) == 1:
             self.output(f'INIT_ARR1({array_def.dims[0]})\n')
@@ -324,11 +355,16 @@ class Emitter:
                 or isinstance(n, EnableRand)
             ): continue
             if isinstance(n, GlobalVarDef):
-                self.global_vars.append(n.name)
+                self.add_symbol(n.name)
                 self.output(f'{n.name} = nil\n')
                 continue
             if isinstance(n, ArrayDef): self.emit_array_def(n); continue
-            if isinstance(n, ReturnSubroutine): self.output('if true then return end\n'); continue
+            if isinstance(n, ReturnSubroutine):
+                self.output('if true then return ')
+                if self.subroutine_args:
+                    self.output('{' + ','.join(self.subroutine_args) + '} ')
+                self.output('end\n')
+                continue
             if isinstance(n, LogicalIfStatement): self.emit_logical_if_stmt(n); continue
             if isinstance(n, Goto): self.emit_goto(n); continue
             if isinstance(n, Assignment): self.emit_assignment(n); continue
@@ -342,7 +378,7 @@ class Emitter:
             if isinstance(n, Pause): self.output(f'PAUSE("{n.msg}")\n'); continue
             if isinstance(n, TypeStatement): self.emit_write(n); continue
             if isinstance(n, Subroutine): self.emit_subroutine(n); continue
-            if isinstance(n, Accept): self.output('READ_KEY()'); continue
+            if isinstance(n, Accept): self.output('READ_KEY()\n'); continue
             if isinstance(n, ArithmeticIfStatement): self.emit_arithmetic_if(n); continue
             
             self.error(f'Node type "{getattr(n, "__name__", n.__class__.__name__)}" not supported')
@@ -355,6 +391,10 @@ class Emitter:
             self.error(f'Node type "{getattr(node, "__name__", node.__class__.__name__)}" not supported')
 
         self.output(header)
+        
+        # Emit functions second
+        for node in self.ast:
+            emit(node, emit_only=[GlobalVarDef])
         
         # Emit functions second
         for node in self.ast:
