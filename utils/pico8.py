@@ -1,6 +1,8 @@
 from utils.parser.models import *
 import os
 
+LOCAL_KEYWORD = ''
+
 logical_ops = {
     'AND': '&',
     'OR': '|',
@@ -25,6 +27,7 @@ class Emitter:
         self.unique_id = 0
         self.global_vars = []
         self.continue_id_stack = []
+        self.subroutine = False
 
         if output and os.path.isfile(output):
             os.remove(output)
@@ -110,7 +113,7 @@ class Emitter:
             return
         
         mname = f'plex{self.get_unique_id()}'
-        self.output(f'local {mname} = ')
+        self.output(f'{LOCAL_KEYWORD} {mname} = ')
         self.emit_expr(goto.multiplexer_expr)
         self.output('\n')
         for i in range(len(goto.stmt_ids)):
@@ -147,7 +150,7 @@ class Emitter:
     
     def emit_array_assignment(self, arr_assign: ArrayAssignment):
         vname = f'assign_values{self.get_unique_id()}'
-        self.output(f'local {vname} = ' + '{')
+        self.output(f'{LOCAL_KEYWORD} {vname} = ' + '{')
         self.output(','.join([Emitter().emit_expr(v).output_buffer for v in arr_assign.value_exprs]))
         self.output('}\n')
         
@@ -194,18 +197,18 @@ class Emitter:
     
     def emit_read(self, read: ReadStatement):
         vname = f'read_values{self.get_unique_id()}'
-        self.output(f'local {vname}=' + '{')
+        self.output(f'{LOCAL_KEYWORD} {vname}=' + '{')
         def outf(f):
             units = f.units or 1
             type = f.type or 'A5'
             if units == 1:
-                return f'fortran_read("{type}", {units})'
+                return f'FORTRAN_READ("{type}", {units})'
             else:
-                return f'table.unpack(fortran_read("{type}", {units}))'
+                return f'table.unpack(FORTRAN_READ("{type}", {units}))'
         self.output(','.join([outf(f) for f in read.formats]))
         self.output('}\n')
         iname = f'write_i{self.get_unique_id()}'
-        self.output(f'local {iname}=1\n')
+        self.output(f'{LOCAL_KEYWORD} {iname}=1\n')
 
         for mem_ref in read.memory_refs:
             if (
@@ -214,6 +217,18 @@ class Emitter:
             ):
                 self.emit_memory_ref(mem_ref)
                 self.output(f'={vname}[{iname}]\n')
+                self.output(f'{iname} = {iname} + 1\n')
+                continue
+            if isinstance(mem_ref, ArrayRefRange):
+                self.output(f'for {mem_ref.counter_name}=')
+                self.emit_expr(mem_ref.start_expr)
+                self.output(',')
+                self.emit_expr(mem_ref.stop_expr)
+                self.output(',1 do\n')
+                self.emit_memory_ref(mem_ref.array_loc_ref)
+                self.output(f'={vname}[{mem_ref.counter_name} + {iname}]\n')
+                self.output('end\n')
+                self.output(f'{iname} = {iname} + 1\n')
                 return
             
             self.error(f'Reference not supported')
@@ -228,7 +243,7 @@ class Emitter:
             self.emit_expr(array_ref_range.start_expr)
             self.output(',')
             self.emit_expr(array_ref_range.stop_expr)
-            self.output(',1 do\nfortran_write(')
+            self.output(',1 do\nFORTRAN_WRITE(')
             self.emit_memory_ref(array_ref_range.array_loc_ref)
             self.output(f')\n')
             self.output('end\n')
@@ -238,9 +253,9 @@ class Emitter:
         for f in write.formats:
             if isinstance(f, str):
                 if f == '\n':
-                    self.output(f'fortran_write("\\n")\n')
+                    self.output(f'FORTRAN_WRITE("\\n")\n')
                 else:
-                    self.output(f'fortran_write({Emitter().emit_expr(f).output_buffer})\n')
+                    self.output(f'FORTRAN_WRITE({Emitter().emit_expr(f).output_buffer})\n')
                 continue
             if isinstance(f, FormatPattern):
                 mem_ref = write.value_list[insert_idx]
@@ -249,7 +264,7 @@ class Emitter:
                     or isinstance(mem_ref, ArrayRef)
                 ):
                     insert_idx += 1
-                    self.output('fortran_write(')
+                    self.output('FORTRAN_WRITE(')
                     self.emit_memory_ref(mem_ref)
                     self.output(f')\n')
                     continue
@@ -258,14 +273,28 @@ class Emitter:
         return
 
     def emit_subroutine(self, fn: Subroutine):
+        self.subroutine = True
         self.output(f'function {fn.name}({",".join(fn.params)})\n')
         for body_stmt in fn.body_stmts:
-            self.emit_statement(body_stmt)
+            self.emit_statement(body_stmt, ignore=[GlobalVarDef])
         self.output('end\n')
+        self.subroutine = False
         pass
     
     def emit_array_def(self, array_def: ArrayDef):
-        self.output(f'{"" if array_def.name in self.global_vars else "local "}{array_def.name}' + ' = {}\n')
+        if self.subroutine and array_def.name in self.global_vars: return
+
+        self.output(f'{"" if array_def.name in self.global_vars else f"{LOCAL_KEYWORD} "}{array_def.name}' + ' = ')
+
+        if len(array_def.dims) == 1:
+            self.output(f'INIT_ARR1({array_def.dims[0]})\n')
+            return
+            
+        if len(array_def.dims) == 2:
+            self.output(f'INIT_ARR2({array_def.dims[0]},{array_def.dims[1]})\n')
+            return
+        
+        self.error('Number of dimensions not supported')
 
     def emit_arithmetic_if(self, if_stmt: ArithmeticIfStatement):
         self.output('if (')
@@ -276,18 +305,30 @@ class Emitter:
         self.output(f'==0) then\ngoto l{str(if_stmt.zero_stmt_id).zfill(5)}\n')
         self.output(f'else\ngoto l{str(if_stmt.pos_stmt_id).zfill(5)}\nend\n')
 
-    def emit_statement(self, stmt: Statement):
-        if stmt.id is not None:
+    def emit_statement(self, stmt: Statement, emit_only=None, ignore=None):
+        
+        nodes = [
+            n for n in stmt.nodes
+            if (
+                (not ignore or n.__class__ not in ignore)
+                and (not emit_only or n.__class__ in emit_only)
+            )
+        ]
+        
+        if nodes and stmt.id is not None:
             self.output(f'::l{str(stmt.id).zfill(5)}::\n')
         
-        for n in stmt.nodes:
+        for n in nodes:
             if (
                 isinstance(n, Implicit)
                 or isinstance(n, EnableRand)
             ): continue
-            if isinstance(n, GlobalVarDef): self.global_vars.append(n.name); continue
+            if isinstance(n, GlobalVarDef):
+                self.global_vars.append(n.name)
+                self.output(f'{n.name} = nil\n')
+                continue
             if isinstance(n, ArrayDef): self.emit_array_def(n); continue
-            if isinstance(n, ReturnSubroutine): self.output('return\n'); continue
+            if isinstance(n, ReturnSubroutine): self.output('if true then return end\n'); continue
             if isinstance(n, LogicalIfStatement): self.emit_logical_if_stmt(n); continue
             if isinstance(n, Goto): self.emit_goto(n); continue
             if isinstance(n, Assignment): self.emit_assignment(n); continue
@@ -297,29 +338,65 @@ class Emitter:
             if isinstance(n, ReadStatement): self.emit_read(n); continue
             if isinstance(n, FormatPattern): continue
             if isinstance(n, Continue): self.output(f'goto c{str(self.continue_id_stack[-1]).zfill(5)}\n'); continue
-            if isinstance(n, Stop) or isinstance(n, ExitProgram): self.output('stop()\n'); continue
-            if isinstance(n, Pause): self.output(f'pause("{n.msg}")\n'); continue
+            if isinstance(n, Stop) or isinstance(n, ExitProgram): self.output('os.exit()\n'); continue
+            if isinstance(n, Pause): self.output(f'PAUSE("{n.msg}")\n'); continue
             if isinstance(n, TypeStatement): self.emit_write(n); continue
             if isinstance(n, Subroutine): self.emit_subroutine(n); continue
-            if isinstance(n, Accept): self.output('read_key()'); continue
+            if isinstance(n, Accept): self.output('READ_KEY()'); continue
             if isinstance(n, ArithmeticIfStatement): self.emit_arithmetic_if(n); continue
             
             self.error(f'Node type "{getattr(n, "__name__", n.__class__.__name__)}" not supported')
 
-    def emit_lua(self):
-        def emit(node):
-            if isinstance(node, Statement): return self.emit_statement(node)
+    def emit_lua(self, header='', emit_only=None, ignore=None):
+        def emit(node, emit_only=None, ignore=None):
+            if isinstance(node, Statement):
+                return self.emit_statement(node, emit_only=emit_only, ignore=ignore)
 
             self.error(f'Node type "{getattr(node, "__name__", node.__class__.__name__)}" not supported')
 
+        self.output(header)
+        
+        # Emit functions second
         for node in self.ast:
-            emit(node)
+            emit(node, emit_only=[Subroutine])
+        
+        # Emit everything else third
+        for node in self.ast:
+            emit(node, ignore=[GlobalVarDef, Subroutine])
     
     def emit_file_hex(self, file_id):
         pass
 
 def export_cartridge(ast, datfilename):
     emitter = Emitter(ast, [datfilename], output='cca.lua')
-    lua = emitter.emit_lua()
+    header = """
+function INIT_ARR1(size)
+local a = {}
+for i=1,size do
+  a[i]=0
+end
+return a
+end
+function INIT_ARR2(size1, size2)
+local a = {}
+for i=1,size1 do
+    a[i] = {}
+    for j=1,size2 do
+    a[i][j]=0
+    end
+end
+return a
+end
+function READ_KEY()
+end
+function PAUSE(msg)
+end
+function FORTRAN_READ(type, units)
+    return {}
+end
+function FORTRAN_WRITE(value)
+end
+"""
+    lua = emitter.emit_lua(header)
     gfx_hex = emitter.emit_file_hex(1)
     pass

@@ -1,28 +1,173 @@
-local IOBJ = {}
-local ICHAIN = {}
-local IPLACE = {}
-local IFIXED = {}
-local COND = {}
-local PROP = {}
-local ABB = {}
-LLINE = {}
-local LTEXT = {}
-local STEXT = {}
-local KEY = {}
-local DEFAULT = {}
-local TRAVEL = {}
-local TK = {}
-local KTAB = {}
-local ATAB = {}
-local BTEXT = {}
-local DSEEN = {}
-local DLOC = {}
-local ODLOC = {}
-local DTRAV = {}
-RTEXT = {}
-local JSPKT = {}
-local IPLT = {}
-local IFIXT = {}
+
+function INIT_ARR1(size)
+local a = {}
+for i=1,size do
+  a[i]=0
+end
+return a
+end
+function INIT_ARR2(size1, size2)
+local a = {}
+for i=1,size1 do
+    a[i] = {}
+    for j=1,size2 do
+    a[i][j]=0
+    end
+end
+return a
+end
+function READ_KEY()
+end
+function PAUSE(msg)
+end
+function FORTRAN_READ(type, units)
+    return {}
+end
+function FORTRAN_WRITE(value)
+end
+function SPEAK(IT)
+ RTEXT = INIT_ARR1(100)
+ LLINE = INIT_ARR2(1000,22)
+KKT=RTEXT[IT]
+if ((KKT==0)) then
+if true then return end
+end
+::l00999::
+for JJT=3,LLINE[KKT][2],1 do
+FORTRAN_WRITE(LLINE[KKT][JJT])
+end
+KKT=(KKT+1)
+if ((LLINE[(KKT-1)][1]~=0)) then
+goto l00999
+end
+::l00997::
+FORTRAN_WRITE("\n")
+if true then return end
+end
+function GETIN(TWOW,B,C,D)
+ A = INIT_ARR1(5)
+ M2 = INIT_ARR1(6)
+ assign_values00001 = {536870912,4194304,32768,256,2,0}
+for assign_i00002=1,6,1 do
+M2=assign_values00001[assign_i00002]
+end
+::l00006::
+READ_KEY()TWOW=0
+S=0
+B=A[1]
+::c00003::
+for J=1,4,1 do
+::c00004::
+for K=1,5,1 do
+MASK1=68182605824
+if ((K~=1)) then
+MASK1=(127*M2[K])
+end
+if ((((A[J]~17315143744)&MASK1)==0)) then
+goto l00003
+end
+if ((S==0)) then
+goto l00002
+end
+TWOW=1
+SHIFT(A[J],(7*(K-1)),XX)
+SHIFT(A[(J+1)],(7*(K-6)),YY)
+MASK=-M2[(6-K)]
+C=((XX&MASK)+(YY&(-2-MASK)))
+goto l00004
+::l00003::
+if ((S==1)) then
+goto l00002
+end
+S=1
+if ((J==1)) then
+B=((B&-M2[K])|(17315143744&(-M2[K]~-1)))
+end
+::l00002::
+goto c00004
+end
+end
+::l00004::
+D=A[2]
+if true then return end
+end
+function YES(X,Y,Z,YEA)
+SPEAK(X)
+GETIN(JUNK,IA1,JUNK,IB1)
+if (((IA1=="NO")|(IA1=="N"))) then
+goto l00001
+end
+YEA=1
+if ((Y~=0)) then
+SPEAK(Y)
+end
+if true then return end
+::l00001::
+YEA=0
+if ((Z~=0)) then
+SPEAK(Z)
+end
+if true then return end
+end
+function SHIFT(VAL,DIST,RES)
+RES=VAL
+if (DIST<0) then
+goto l00010
+elseif (DIST==0) then
+goto l00020
+else
+goto l00030
+end
+::l00010::
+IDIST=-DIST
+::c00005::
+for I=1,IDIST,1 do
+J=0
+if ((RES<0)) then
+J=17179869184
+end
+::l00011::
+RES=(((RES&34359738367)/2)+J)
+end
+::l00020::
+if true then return end
+::l00030::
+::c00006::
+for I=1,DIST,1 do
+J=0
+if (((RES&17179869184)~=0)) then
+J=34359738368
+end
+::l00031::
+RES=((RES&17179869183)*(2+J))
+end
+if true then return end
+end
+ IOBJ = INIT_ARR1(300)
+ ICHAIN = INIT_ARR1(100)
+ IPLACE = INIT_ARR1(100)
+ IFIXED = INIT_ARR1(100)
+ COND = INIT_ARR1(300)
+ PROP = INIT_ARR1(100)
+ ABB = INIT_ARR1(300)
+ LLINE = INIT_ARR2(1000,22)
+ LTEXT = INIT_ARR1(300)
+ STEXT = INIT_ARR1(300)
+ KEY = INIT_ARR1(300)
+ DEFAULT = INIT_ARR1(300)
+ TRAVEL = INIT_ARR1(1000)
+ TK = INIT_ARR1(25)
+ KTAB = INIT_ARR1(1000)
+ ATAB = INIT_ARR1(1000)
+ BTEXT = INIT_ARR1(200)
+ DSEEN = INIT_ARR1(10)
+ DLOC = INIT_ARR1(10)
+ ODLOC = INIT_ARR1(10)
+ DTRAV = INIT_ARR1(20)
+ RTEXT = INIT_ARR1(100)
+ JSPKT = INIT_ARR1(100)
+ IPLT = INIT_ARR1(100)
+ IFIXT = INIT_ARR1(100)
 if ((SETUP~=0)) then
 goto l00001
 end
@@ -37,23 +182,23 @@ SNAKE=11
 FOOD=19
 WATER=20
 AXE=21
-local assign_values00001 = {24,29,0,31,0,31,38,38,42,42,43,46,77,71,73,75}
+ assign_values00007 = {24,29,0,31,0,31,38,38,42,42,43,46,77,71,73,75}
 for I=1,16,1 do
-JSPKT[I]=assign_values00001[I]
+JSPKT[I]=assign_values00007[I]
 end
-local assign_values00002 = {3,3,8,10,11,14,13,9,15,18,19,17,27,28,29,30,0,0,3,3}
+ assign_values00008 = {3,3,8,10,11,14,13,9,15,18,19,17,27,28,29,30,0,0,3,3}
 for I=1,20,1 do
-IPLT[I]=assign_values00002[I]
+IPLT[I]=assign_values00008[I]
 end
-local assign_values00003 = {0,0,1,0,0,1,0,1,1,0,1,1,0,0,0,0,0,0,0,0}
+ assign_values00009 = {0,0,1,0,0,1,0,1,1,0,1,1,0,0,0,0,0,0,0,0}
 for I=1,20,1 do
-IFIXT[I]=assign_values00003[I]
+IFIXT[I]=assign_values00009[I]
 end
-local assign_values00004 = {36,28,19,30,62,60,41,27,17,15,19,28,36,300,300}
+ assign_values00010 = {36,28,19,30,62,60,41,27,17,15,19,28,36,300,300}
 for I=1,15,1 do
-DTRAV[I]=assign_values00004[I]
+DTRAV[I]=assign_values00010[I]
 end
-::c00005::
+::c00011::
 for I=1,300,1 do
 STEXT[I]=0
 if ((I<=200)) then
@@ -67,44 +212,48 @@ LTEXT[I]=0
 end
 I=1
 ::l01002::
-local read_values00006={fortran_read("G", 1)}
-local write_i00007=1
-IKIND=read_values00006[write_i00007]
-::l01003::
-local plex00008 = (IKIND+1)
-if (plex00008==1) then
+ read_values00012={FORTRAN_READ("G", 1)}
+ write_i00013=1
+IKIND=read_values00012[write_i00013]
+write_i00013 = write_i00013 + 1
+ plex00014 = (IKIND+1)
+if (plex00014==1) then
 goto l01100
-elseif (plex00008==2) then
+elseif (plex00014==2) then
 goto l01004
-elseif (plex00008==3) then
+elseif (plex00014==3) then
 goto l01004
-elseif (plex00008==4) then
+elseif (plex00014==4) then
 goto l01013
-elseif (plex00008==5) then
+elseif (plex00014==5) then
 goto l01020
-elseif (plex00008==6) then
+elseif (plex00014==6) then
 goto l01004
 else
 goto l01004
 end
 ::l01004::
-local read_values00009={fortran_read("G", 1),table.unpack(fortran_read("A5", 20))}
-local write_i00010=1
-JKIND=read_values00009[write_i00010]
-::l01005::
+ read_values00015={FORTRAN_READ("G", 1),table.unpack(FORTRAN_READ("A5", 20))}
+ write_i00016=1
+JKIND=read_values00015[write_i00016]
+write_i00016 = write_i00016 + 1
+for J=3,22,1 do
+LLINE[I][J]=read_values00015[J + write_i00016]
+end
+write_i00016 = write_i00016 + 1
 if ((JKIND==-1)) then
 goto l01002
 end
-::c00011::
+::c00017::
 for K=1,20,1 do
 KK=K
 if ((LLINE[I][(21-K)]~=" ")) then
 goto l01007
 end
 ::l01006::
-goto c00011
+goto c00017
 end
-stop()
+os.exit()
 ::l01007::
 LLINE[I][2]=((20-KK)+1)
 LLINE[I][1]=0
@@ -135,7 +284,7 @@ I=(I+1)
 if ((I~=1000)) then
 goto l01004
 end
-pause("TOO MANY LINES")
+PAUSE("TOO MANY LINES")
 ::l01011::
 if ((JKIND<200)) then
 goto l01012
@@ -161,10 +310,16 @@ goto l01010
 ::l01013::
 I=1
 ::l01014::
-local read_values00012={table.unpack(fortran_read("G", 12))}
-local write_i00013=1
-JKIND=read_values00012[write_i00013]
-::l01015::
+ read_values00018={table.unpack(FORTRAN_READ("G", 12))}
+ write_i00019=1
+JKIND=read_values00018[write_i00019]
+write_i00019 = write_i00019 + 1
+LKIND=read_values00018[write_i00019]
+write_i00019 = write_i00019 + 1
+for L=1,10,1 do
+TK[L]=read_values00018[L + write_i00019]
+end
+write_i00019 = write_i00019 + 1
 if ((JKIND==-1)) then
 goto l01002
 end
@@ -176,7 +331,7 @@ goto l01017
 ::l01016::
 TRAVEL[(I-1)]=-TRAVEL[(I-1)]
 ::l01017::
-::c00014::
+::c00020::
 for L=1,10,1 do
 if ((TK[L]==0)) then
 goto l01019
@@ -184,44 +339,46 @@ end
 TRAVEL[I]=(LKIND*(1024+TK[L]))
 I=(I+1)
 if ((I==1000)) then
-stop()
+os.exit()
 end
 ::l01018::
-goto c00014
+goto c00020
 end
 ::l01019::
 TRAVEL[(I-1)]=-TRAVEL[(I-1)]
 goto l01014
 ::l01020::
-::c00015::
+::c00021::
 for IU=1,1000,1 do
-local read_values00016={fortran_read("G", 1),fortran_read("A5", 1)}
-local write_i00017=1
-KTAB[IU]=read_values00016[write_i00017]
-::l01021::
+ read_values00022={FORTRAN_READ("G", 1),FORTRAN_READ("A5", 1)}
+ write_i00023=1
+KTAB[IU]=read_values00022[write_i00023]
+write_i00023 = write_i00023 + 1
+ATAB[IU]=read_values00022[write_i00023]
+write_i00023 = write_i00023 + 1
 if ((KTAB[IU]==-1)) then
 goto l01002
 end
 ::l01022::
-goto c00015
+goto c00021
 end
-pause("TOO MANY WORDS")
+PAUSE("TOO MANY WORDS")
 ::l01100::
-::c00018::
+::c00024::
 for I=1,100,1 do
 IPLACE[I]=IPLT[I]
 IFIXED[I]=IFIXT[I]
 ::l01101::
 ICHAIN[I]=0
 end
-::c00019::
+::c00025::
 for I=1,300,1 do
 COND[I]=0
 ABB[I]=0
 ::l01102::
 IOBJ[I]=0
 end
-::c00020::
+::c00026::
 for I=1,10,1 do
 ::l01103::
 COND[I]=1
@@ -237,7 +394,7 @@ COND[26]=2
 COND[31]=2
 COND[32]=2
 COND[79]=2
-::c00021::
+::c00027::
 for I=1,100,1 do
 KTEM=IPLACE[I]
 if ((KTEM==0)) then
@@ -260,20 +417,20 @@ goto l01107
 KTEM=ICHAIN[KTEM]
 goto l01105
 ::l01107::
-goto c00021
+goto c00027
 end
 IDWARF=0
 IFIRST=1
 IWEST=0
 ILONG=1
 IDETAL=0
-pause("INIT DONE")
+PAUSE("INIT DONE")
 ::l00001::
 YES(65,1,0,YEA)
 L=1
 LOC=1
 ::l00002::
-::c00022::
+::c00028::
 for I=1,3,1 do
 if (((ODLOC[I]~=L)|(DSEEN[I]==0))) then
 goto l00073
@@ -282,7 +439,7 @@ L=LOC
 SPEAK(2)
 goto l00074
 ::l00073::
-goto c00022
+goto c00028
 end
 ::l00074::
 LOC=L
@@ -301,7 +458,7 @@ if ((math.random()>0.05)) then
 goto l00071
 end
 IDWARF=2
-::c00023::
+::c00029::
 for I=1,3,1 do
 DLOC[I]=0
 ODLOC[I]=0
@@ -318,7 +475,7 @@ IDWARF=(IDWARF+1)
 ATTACK=0
 DTOT=0
 STICK=0
-::c00024::
+::c00030::
 for I=1,3,1 do
 if (((2*(I+IDWARF))<8)) then
 goto l00066
@@ -347,7 +504,7 @@ if ((math.random()<0.1)) then
 STICK=(STICK+1)
 end
 ::l00066::
-goto c00024
+goto c00030
 end
 if ((DTOT==0)) then
 goto l00071
@@ -355,11 +512,10 @@ end
 if ((DTOT==1)) then
 goto l00075
 end
-fortran_write(" THERE ARE ")
-fortran_write(DTOT)
-fortran_write(" THREATENING LITTLE DWARVES IN THE ROOM WITH YOU.")
-fortran_write("\n")
-::l00067::
+FORTRAN_WRITE(" THERE ARE ")
+FORTRAN_WRITE(DTOT)
+FORTRAN_WRITE(" THREATENING LITTLE DWARVES IN THE ROOM WITH YOU.")
+FORTRAN_WRITE("\n")
 goto l00077
 ::l00075::
 SPEAK(4)
@@ -370,17 +526,16 @@ end
 if ((ATTACK==1)) then
 goto l00079
 end
-fortran_write(" ")
-fortran_write(ATTACK)
-fortran_write(" OF THEM THROW KNIVES AT YOU!")
-fortran_write("\n")
-::l00078::
+FORTRAN_WRITE(" ")
+FORTRAN_WRITE(ATTACK)
+FORTRAN_WRITE(" OF THEM THROW KNIVES AT YOU!")
+FORTRAN_WRITE("\n")
 goto l00081
 ::l00079::
 SPEAK(5)
 SPEAK((52+STICK))
-local plex00025 = (STICK+1)
-if (plex00025==1) then
+ plex00031 = (STICK+1)
+if (plex00031==1) then
 goto l00071
 else
 goto l00083
@@ -392,16 +547,15 @@ end
 if ((STICK==1)) then
 goto l00082
 end
-fortran_write(" ")
-fortran_write(STICK)
-fortran_write(" OF THEM GET YOU.")
-fortran_write("\n")
-::l00068::
+FORTRAN_WRITE(" ")
+FORTRAN_WRITE(STICK)
+FORTRAN_WRITE(" OF THEM GET YOU.")
+FORTRAN_WRITE("\n")
 goto l00083
 ::l00082::
 SPEAK(6)
 ::l00083::
-pause("GAMES OVER")
+PAUSE("GAMES OVER")
 goto l00071
 ::l00069::
 SPEAK(7)
@@ -415,15 +569,13 @@ goto l00007
 end
 ::l00004::
 for JJ=3,LLINE[KK][2],1 do
-fortran_write(LLINE[KK][JJ])
+FORTRAN_WRITE(LLINE[KK][JJ])
 end
-::l00005::
 KK=(KK+1)
 if ((LLINE[(KK-1)][1]~=0)) then
 goto l00004
 end
-fortran_write("\n")
-::l00006::
+FORTRAN_WRITE("\n")
 ::l00007::
 if ((COND[L]==2)) then
 goto l00008
@@ -508,32 +660,32 @@ if ((L<300)) then
 goto l00002
 end
 IL=((L-300)+1)
-local plex00026 = IL
-if (plex00026==1) then
+ plex00032 = IL
+if (plex00032==1) then
 goto l00022
-elseif (plex00026==2) then
+elseif (plex00032==2) then
 goto l00023
-elseif (plex00026==3) then
+elseif (plex00032==3) then
 goto l00024
-elseif (plex00026==4) then
+elseif (plex00032==4) then
 goto l00025
-elseif (plex00026==5) then
+elseif (plex00032==5) then
 goto l00026
-elseif (plex00026==6) then
+elseif (plex00032==6) then
 goto l00031
-elseif (plex00026==7) then
+elseif (plex00032==7) then
 goto l00027
-elseif (plex00026==8) then
+elseif (plex00032==8) then
 goto l00028
-elseif (plex00026==9) then
+elseif (plex00032==9) then
 goto l00029
-elseif (plex00026==10) then
+elseif (plex00032==10) then
 goto l00030
-elseif (plex00026==11) then
+elseif (plex00032==11) then
 goto l00033
-elseif (plex00026==12) then
+elseif (plex00032==12) then
 goto l00034
-elseif (plex00026==13) then
+elseif (plex00032==13) then
 goto l00036
 else
 goto l00037
@@ -594,7 +746,7 @@ L=32
 end
 goto l00002
 ::l00031::
-pause("GAME IS OVER")
+PAUSE("GAME IS OVER")
 goto l01100
 ::l00032::
 if ((IDETAL<3)) then
@@ -692,15 +844,13 @@ goto l02008
 end
 ::l02005::
 for JJ=3,LLINE[KK][2],1 do
-fortran_write(LLINE[KK][JJ])
+FORTRAN_WRITE(LLINE[KK][JJ])
 end
-::l02006::
 KK=(KK+1)
 if ((LLINE[(KK-1)][1]~=0)) then
 goto l02005
 end
-fortran_write("\n")
-::l02007::
+FORTRAN_WRITE("\n")
 ::l02008::
 I=ICHAIN[I]
 goto l02004
@@ -738,7 +888,7 @@ goto l02023
 end
 SPEAK(17)
 ::l02023::
-::c00027::
+::c00033::
 for I=1,1000,1 do
 if ((KTAB[I]==-1)) then
 goto l03000
@@ -747,23 +897,23 @@ if ((ATAB[I]==A)) then
 goto l02025
 end
 ::l02024::
-goto c00027
+goto c00033
 end
-pause("ERROR 6")
+PAUSE("ERROR 6")
 ::l02025::
 K=(KTAB[I]%1000)
 KQ=(KTAB[I]/(1000+1))
-local plex00028 = KQ
-if (plex00028==1) then
+ plex00034 = KQ
+if (plex00034==1) then
 goto l05014
-elseif (plex00028==2) then
+elseif (plex00034==2) then
 goto l05000
-elseif (plex00028==3) then
+elseif (plex00034==3) then
 goto l02026
 else
 goto l02010
 end
-pause("NO NO")
+PAUSE("NO NO")
 ::l02026::
 JVERB=K
 JSPK=JSPKT[JVERB]
@@ -774,41 +924,41 @@ if ((JOBJ==0)) then
 goto l02036
 end
 ::l02027::
-local plex00029 = JVERB
-if (plex00029==1) then
+ plex00035 = JVERB
+if (plex00035==1) then
 goto l09000
-elseif (plex00029==2) then
+elseif (plex00035==2) then
 goto l05066
-elseif (plex00029==3) then
+elseif (plex00035==3) then
 goto l03000
-elseif (plex00029==4) then
+elseif (plex00035==4) then
 goto l05031
-elseif (plex00029==5) then
+elseif (plex00035==5) then
 goto l02009
-elseif (plex00029==6) then
+elseif (plex00035==6) then
 goto l05031
-elseif (plex00029==7) then
+elseif (plex00035==7) then
 goto l09404
-elseif (plex00029==8) then
+elseif (plex00035==8) then
 goto l09406
-elseif (plex00029==9) then
+elseif (plex00035==9) then
 goto l05081
-elseif (plex00029==10) then
+elseif (plex00035==10) then
 goto l05200
-elseif (plex00029==11) then
+elseif (plex00035==11) then
 goto l05200
-elseif (plex00029==12) then
+elseif (plex00035==12) then
 goto l05300
-elseif (plex00029==13) then
+elseif (plex00035==13) then
 goto l05506
-elseif (plex00029==14) then
+elseif (plex00035==14) then
 goto l05502
-elseif (plex00029==15) then
+elseif (plex00035==15) then
 goto l05504
 else
 goto l05505
 end
-pause("ERROR 5")
+PAUSE("ERROR 5")
 ::l02028::
 A=WD2
 B=" "
@@ -858,52 +1008,52 @@ end
 SPEAK(22)
 goto l02020
 ::l02036::
-local plex00030 = JVERB
-if (plex00030==1) then
+ plex00036 = JVERB
+if (plex00036==1) then
 goto l02037
-elseif (plex00030==2) then
+elseif (plex00036==2) then
 goto l05062
-elseif (plex00030==3) then
+elseif (plex00036==3) then
 goto l05062
-elseif (plex00030==4) then
+elseif (plex00036==4) then
 goto l09403
-elseif (plex00030==5) then
+elseif (plex00036==5) then
 goto l02009
-elseif (plex00030==6) then
+elseif (plex00036==6) then
 goto l09403
-elseif (plex00030==7) then
+elseif (plex00036==7) then
 goto l09404
-elseif (plex00030==8) then
+elseif (plex00036==8) then
 goto l09406
-elseif (plex00030==9) then
+elseif (plex00036==9) then
 goto l05062
-elseif (plex00030==10) then
+elseif (plex00036==10) then
 goto l05062
-elseif (plex00030==11) then
+elseif (plex00036==11) then
 goto l05200
-elseif (plex00030==12) then
+elseif (plex00036==12) then
 goto l05300
-elseif (plex00030==13) then
+elseif (plex00036==13) then
 goto l05062
-elseif (plex00030==14) then
+elseif (plex00036==14) then
 goto l05062
-elseif (plex00030==15) then
+elseif (plex00036==15) then
 goto l05062
 else
 goto l05062
 end
-pause("OOPS")
+PAUSE("OOPS")
 ::l02037::
 if (((IOBJ[J]==0)|(ICHAIN[IOBJ[J]]~=0))) then
 goto l05062
 end
-::c00031::
+::c00037::
 for I=1,3,1 do
 if ((DSEEN[I]~=0)) then
 goto l05062
 end
 ::l05312::
-goto c00031
+goto c00037
 end
 JOBJ=IOBJ[J]
 goto l02027
@@ -911,18 +1061,16 @@ goto l02027
 if ((B~=" ")) then
 goto l05333
 end
-fortran_write("  ")
-fortran_write(A)
-fortran_write(" WHAT?")
-fortran_write("\n")
-::l05063::
+FORTRAN_WRITE("  ")
+FORTRAN_WRITE(A)
+FORTRAN_WRITE(" WHAT?")
+FORTRAN_WRITE("\n")
 goto l02020
 ::l05333::
-fortran_write(" ")
-fortran_write(A)
-fortran_write(" WHAT?")
-fortran_write("\n")
-::l05334::
+FORTRAN_WRITE(" ")
+FORTRAN_WRITE(A)
+FORTRAN_WRITE(" WHAT?")
+FORTRAN_WRITE("\n")
 goto l02020
 ::l05014::
 if ((IDARK==0)) then
@@ -933,7 +1081,7 @@ goto l00008
 end
 ::l05017::
 SPEAK(23)
-pause("GAME IS OVER")
+PAUSE("GAME IS OVER")
 goto l02011
 ::l05000::
 JOBJ=K
@@ -956,17 +1104,15 @@ end
 if ((B~=" ")) then
 goto l05316
 end
-fortran_write(" I SEE NO ")
-fortran_write(A)
-fortran_write(" HERE.")
-fortran_write("\n")
-::l05005::
+FORTRAN_WRITE(" I SEE NO ")
+FORTRAN_WRITE(A)
+FORTRAN_WRITE(" HERE.")
+FORTRAN_WRITE("\n")
 goto l02011
 ::l05316::
-fortran_write(" I SEE NO ")
-fortran_write(A)
-fortran_write(" HERE.\n")
-::l05317::
+FORTRAN_WRITE(" I SEE NO ")
+FORTRAN_WRITE(A)
+FORTRAN_WRITE(" HERE.\n")
 goto l02011
 ::l05098::
 K=49
@@ -983,18 +1129,16 @@ end
 if ((B~=" ")) then
 goto l05314
 end
-fortran_write(" WHAT DO YOU WANT TO DO WITH THE ")
-fortran_write(A)
-fortran_write("?")
-fortran_write("\n")
-::l05001::
+FORTRAN_WRITE(" WHAT DO YOU WANT TO DO WITH THE ")
+FORTRAN_WRITE(A)
+FORTRAN_WRITE("?")
+FORTRAN_WRITE("\n")
 goto l02020
 ::l05314::
-fortran_write(" WHAT DO YOU WANT TO DO WITH THE ")
-fortran_write(A)
-fortran_write("?")
-fortran_write("\n")
-::l05315::
+FORTRAN_WRITE(" WHAT DO YOU WANT TO DO WITH THE ")
+FORTRAN_WRITE(A)
+FORTRAN_WRITE("?")
+FORTRAN_WRITE("\n")
 goto l02020
 ::l09000::
 if ((JOBJ==18)) then
@@ -1142,14 +1286,14 @@ end
 PROP[12]=1
 goto l02003
 ::l05300::
-::c00032::
+::c00038::
 for ID=1,3,1 do
 IID=ID
 if ((DSEEN[ID]~=0)) then
 goto l05307
 end
 ::l05313::
-goto c00032
+goto c00038
 end
 if ((JOBJ==0)) then
 goto l05062
@@ -1206,125 +1350,4 @@ JSPK=78
 end
 PROP[WATER]=1
 goto l05200
-stop()
-function SPEAK(IT)
-RTEXT = {}
-LLINE = {}
-KKT=RTEXT[IT]
-if ((KKT==0)) then
-return
-end
-::l00999::
-for JJT=3,LLINE[KKT][2],1 do
-fortran_write(LLINE[KKT][JJT])
-end
-::l00998::
-KKT=(KKT+1)
-if ((LLINE[(KKT-1)][1]~=0)) then
-goto l00999
-end
-::l00997::
-fortran_write("\n")
-::l00996::
-return
-end
-function GETIN(TWOW,B,C,D)
-local A = {}
-local M2 = {}
-local assign_values00033 = {536870912,4194304,32768,256,2,0}
-for assign_i00034=1,6,1 do
-M2=assign_values00033[assign_i00034]
-end
-::l00006::
-read_key()::l00001::
-TWOW=0
-S=0
-B=A[1]
-::c00035::
-for J=1,4,1 do
-::c00036::
-for K=1,5,1 do
-MASK1=68182605824
-if ((K~=1)) then
-MASK1=(127*M2[K])
-end
-if ((((A[J]~17315143744)&MASK1)==0)) then
-goto l00003
-end
-if ((S==0)) then
-goto l00002
-end
-TWOW=1
-SHIFT(A[J],(7*(K-1)),XX)
-SHIFT(A[(J+1)],(7*(K-6)),YY)
-MASK=-M2[(6-K)]
-C=((XX&MASK)+(YY&(-2-MASK)))
-goto l00004
-::l00003::
-if ((S==1)) then
-goto l00002
-end
-S=1
-if ((J==1)) then
-B=((B&-M2[K])|(17315143744&(-M2[K]~-1)))
-end
-::l00002::
-goto c00036
-end
-end
-::l00004::
-D=A[2]
-return
-end
-function YES(X,Y,Z,YEA)
-SPEAK(X)
-GETIN(JUNK,IA1,JUNK,IB1)
-if (((IA1=="NO")|(IA1=="N"))) then
-goto l00001
-end
-YEA=1
-if ((Y~=0)) then
-SPEAK(Y)
-end
-return
-::l00001::
-YEA=0
-if ((Z~=0)) then
-SPEAK(Z)
-end
-return
-end
-function SHIFT(VAL,DIST,RES)
-RES=VAL
-if (DIST<0) then
-goto l00010
-elseif (DIST==0) then
-goto l00020
-else
-goto l00030
-end
-::l00010::
-IDIST=-DIST
-::c00037::
-for I=1,IDIST,1 do
-J=0
-if ((RES<0)) then
-J=17179869184
-end
-::l00011::
-RES=(((RES&34359738367)/2)+J)
-end
-::l00020::
-return
-::l00030::
-::c00038::
-for I=1,DIST,1 do
-J=0
-if (((RES&17179869184)~=0)) then
-J=34359738368
-end
-::l00031::
-RES=((RES&17179869183)*(2+J))
-end
-return
-end
+os.exit()
