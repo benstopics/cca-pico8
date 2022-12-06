@@ -363,7 +363,7 @@ class SyntacticAnalyzer:
         
         expr = self.get_value_expr()
         while (
-            self.lookahead().chars in ['+', '-']
+            self.lookahead().chars in ['*', '/']
             and self.lookahead().chars not in invalid_ops
         ):
             op = self.consume(ArithmeticOperator)
@@ -374,13 +374,13 @@ class SyntacticAnalyzer:
     
     def get_arithmetic_expr(self, invalid_ops=[]):
         
-        expr = self.get_arithmetic_expr_prec2()
+        expr = self.get_arithmetic_expr_prec2(invalid_ops=invalid_ops)
         while (
-            self.lookahead().chars in ['*', '/']
+            self.lookahead().chars in ['+', '-']
             and self.lookahead().chars not in invalid_ops
         ):
             op = self.consume(ArithmeticOperator)
-            rterm = self.get_arithmetic_expr_prec2()
+            rterm = self.get_arithmetic_expr_prec2(invalid_ops=invalid_ops)
             expr = ArithmeticExpr(expr, op, rterm)
         
         return expr

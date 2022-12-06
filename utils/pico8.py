@@ -132,10 +132,7 @@ class Emitter:
         for i in range(len(goto.stmt_ids)):
             if i > 0:
                 self.output('else')
-            if i == len(goto.stmt_ids) - 1:
-                self.output('\n')
-            if i == 0 or i < len(goto.stmt_ids) - 1:
-                self.output(f'if ({mname}=={i + 1}) then\n')
+            self.output(f'if ({mname}=={i + 1}) then\n')
             self.output(f'goto l{str(goto.stmt_ids[i]).zfill(5)}\n')
             if i == len(goto.stmt_ids) - 1:
                 self.output('end\n')
