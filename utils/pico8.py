@@ -4,9 +4,8 @@ import os
 LOCAL_KEYWORD = 'local'
 
 logical_ops = {
-    'AND': '&',
-    'OR': '|',
-    'XOR': '~'
+    'AND': ' and ',
+    'OR': ' or '
 }
 
 relational_ops = {
@@ -73,6 +72,8 @@ class Emitter:
             self.output(')')
             return self
         if isinstance(expr, ArithmeticExpr):
+            if expr.op == '/':
+                self.output('math.floor')
             self.output('(')
             self.emit_expr(expr.lterm)
             self.output(expr.op)
@@ -155,9 +156,10 @@ class Emitter:
         raise Exception('Invalid reference')
     
     def emit_assignment(self, assign: Assignment):
-        if self.subroutine and not self.symbol_known(assign.memory_ref.name):
+        if not self.symbol_known(assign.memory_ref.name):
             self.add_symbol(assign.memory_ref.name)
-            self.output(f'{LOCAL_KEYWORD} ')
+            if self.subroutine:
+                self.output(f'{LOCAL_KEYWORD} ')
         self.emit_memory_ref(assign.memory_ref)
         self.output('=')
         self.emit_expr(assign.value_expr)
@@ -183,7 +185,7 @@ class Emitter:
         if isinstance(arr_assign.loc_ref, VariableRef):
             iname = f'ASSIGN_I{self.get_unique_id()}'
             self.output(f'for {iname}=1,{len(arr_assign.value_exprs)},1 do\n')
-            self.output(f'{arr_assign.loc_ref.name}={vname}[{iname}]\n')
+            self.output(f'{arr_assign.loc_ref.name}[{iname}]={vname}[{iname}]\n')
             self.output('end\n')
             return
         
@@ -193,15 +195,19 @@ class Emitter:
         if continue_id is None:
             continue_id = self.get_unique_id()
         self.continue_id_stack.append(continue_id)
-        self.output(f'for {forloop.counter_name}=')
+        self.output(f'{forloop.counter_name}=')
         self.emit_expr(forloop.start_expr)
-        self.output(',')
+        self.output(' - 1\n')
+        forloop_id = self.get_unique_id()
+        self.output(f'::c{continue_id.zfill(5)}::\n')
+        self.output(f'{forloop.counter_name} = {forloop.counter_name} + 1\n')
+        self.output(f'if {forloop.counter_name} > ')
         self.emit_expr(forloop.stop_expr)
-        self.output(',1 do\n')
+        self.output(f' then goto f{forloop_id.zfill(5)} end\n')
         for body_stmt in forloop.body_stmts:
             self.emit_statement(body_stmt)
-        self.output(f'::c{continue_id.zfill(5)}::\n')
-        self.output('end\n')
+        self.output(f'goto c{continue_id.zfill(5)}\n')
+        self.output(f'::f{forloop_id.zfill(5)}::\n')
         self.continue_id_stack.pop()
     
     def emit_call(self, call: CallSubroutine):
@@ -244,6 +250,7 @@ class Emitter:
                 self.output(',')
                 self.emit_expr(mem_ref.stop_expr)
                 self.output(',1 do\n')
+                self.output(f'if type({vname}[{iname}]) == "string" and #{vname}[{iname}] == 0 then {vname}[{iname}] = " " end\n')
                 self.emit_memory_ref(mem_ref.array_loc_ref)
                 self.output(f'={vname}[{iname}]\n')
                 self.output(f'{iname} = {iname} + 1\n')
@@ -251,8 +258,6 @@ class Emitter:
                 return
             
             self.error(f'Reference not supported')
-        
-        self.output('READ_LINE_IDX = READ_LINE_IDX + 1\n')
     
     def emit_write(self, write: TypeStatement):
         if (
@@ -294,8 +299,34 @@ class Emitter:
         return
 
     def emit_subroutine(self, fn: Subroutine):
-        self.subroutine = True
+        if fn.name == 'SHIFT': return
+
         self.output(f'function {fn.name}({",".join(fn.params)})\n')
+
+        if fn.name == 'GETIN':
+            self.output("""    local input = string.sub(io.read(), 1, 20)
+    local words = {}
+    for word in input:gmatch("%w+") do table.insert(words, word) end
+    local twow, firstw, secondw_ext, secondw
+    if #words > 0 then
+        firstw = string.sub(words[1], 1, 5)
+        if #words > 1 then
+            twow = 1
+            secondw = string.sub(words[2], 1, 5)
+            secondw_ext = string.sub(words[2], 6, 20)
+            if #secondw_ext == 0 then secondw_ext = ' ' end
+        else
+            twow = 0
+            secondw = ' '
+            secondw_ext = ' '
+        end
+    end
+    return {twow, firstw, secondw, secondw_ext}
+end\n
+""")
+            return
+
+        self.subroutine = True
         self.subroutine_args = [*fn.params]
         self.symbol_stack.append(fn.params)
         for body_stmt in fn.body_stmts:
@@ -351,6 +382,7 @@ class Emitter:
             ): continue
             if isinstance(n, GlobalVarDef):
                 self.add_symbol(n.name)
+                self.global_vars.append(n.name)
                 self.output(f'{n.name} = nil\n')
                 continue
             if isinstance(n, ArrayDef): self.emit_array_def(n); continue
@@ -373,7 +405,7 @@ class Emitter:
             if isinstance(n, Pause): self.output(f'PAUSE("{n.msg}")\n'); continue
             if isinstance(n, TypeStatement): self.emit_write(n); continue
             if isinstance(n, Subroutine): self.emit_subroutine(n); continue
-            if isinstance(n, Accept): self.output('READ_KEY()\n'); continue
+            if isinstance(n, Accept): self.output(f'{n.array_ref_range.array_loc_ref.name} = READ_KEY()\n'); continue
             if isinstance(n, ArithmeticIfStatement): self.emit_arithmetic_if(n); continue
             
             self.error(f'Node type "{getattr(n, "__name__", n.__class__.__name__)}" not supported')
@@ -447,12 +479,9 @@ function INIT_ARR2(size1, size2)
     return a
 end
 
-function READ_KEY()
-    local test = 1
-end
-
 function PAUSE(msg)
-    local test = 1
+    print(msg)
+    return io.read()
 end
 
 READ_LINE_IDX = 1
@@ -472,8 +501,8 @@ function FORTRAN_READ(types, units)
                 table.insert(result, v)
                 line = string.sub(line, 6, #line)
             elseif t == "A5" then
-                table.insert(result, string.sub(line, 1, 1))
-                line = string.sub(line, 2, #line)
+                table.insert(result, string.sub(line, 1, 5))
+                line = string.sub(line, 6, #line)
             else
                 error("Unsupported format type " .. t)
             end
@@ -483,8 +512,8 @@ function FORTRAN_READ(types, units)
     return result
 end
 
-function FORTRAN_WRITE(value)
-    local test = 1
+function FORTRAN_WRITE(text)
+    io.write(text)
 end
 """
     lua = emitter.emit_lua(header)
