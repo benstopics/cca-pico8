@@ -1,3 +1,4 @@
+from utils.counter_symbols import get_num_symbols
 from utils.parser import build_ast
 from utils.pico8 import export_cartridge
 

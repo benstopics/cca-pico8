@@ -2,6 +2,7 @@ from utils.parser.models import *
 import os
 
 LOCAL_KEYWORD = 'local'
+PICO8 = True
 
 logical_ops = {
     'AND': ' and ',
@@ -108,7 +109,7 @@ class Emitter:
             self.output(f'"{s}"')
             return self
         if isinstance(expr, RandExpr):
-            self.output('math.random()')
+            self.output('math.random()' if not PICO8 else 'rnd()')
             return self
         
         self.error(f'Invalid expression')
@@ -217,7 +218,7 @@ class Emitter:
         if call.args:
             self.output(', '.join([a.name if getattr(a, 'name', None) else '_' for a in call.args]))
             self.output(' = ')
-            self.output('table.unpack(')
+            self.output('unpack(')
         self.output(call.name)
         self.output(f'({",".join([Emitter().emit_expr(a).output_buffer for a in call.args])})')
         if call.args:
@@ -301,16 +302,60 @@ class Emitter:
         self.output(f'function {fn.name}({",".join(fn.params)})\n')
 
         if fn.name == 'GETIN':
-            self.output("""    local input = string.sub(io.read(), 1, 20)
+            if not PICO8:
+                self.output("""    local input = sub(io.read(), 1, 20)
     local words = {}
-    for word in input:gmatch("%w+") do table.insert(words, word) end
+    for word in input:gmatch("%w+") do add(words, word) end
     local twow, firstw, secondw_ext, secondw
     if #words > 0 then
-        firstw = string.sub(words[1], 1, 5)
+        firstw = sub(words[1], 1, 5)
         if #words > 1 then
             twow = 1
-            secondw = string.sub(words[2], 1, 5)
-            secondw_ext = string.sub(words[2], 6, 20)
+            secondw = sub(words[2], 1, 5)
+            secondw_ext = sub(words[2], 6, 20)
+            if #secondw_ext == 0 then secondw_ext = ' ' end
+        else
+            twow = 0
+            secondw = ' '
+            secondw_ext = ' '
+        end
+    end
+    return {twow, firstw, secondw, secondw_ext}
+end\n
+""")
+            else:
+                self.output("""    for i=0,10,1 do
+        print("type in some text:",28,100,11)
+        repeat
+        grect(0,108,128,5)
+        print(t,64-len(t)*2,108,6)
+        grect(64+len(t)*2,108,3,5,8)
+        flip()
+        grect(64+len(t)*2,108,3,5,0)
+        if stat(30)==true then
+            c=stat(31)
+            if c>=" " and c<="z" then
+            t=t..c
+            elseif c=="\8" then
+            t=fnd(t)
+            elseif c!="\13" then
+            cls()
+            color(7)
+            print("raw key:")
+            print(asc(c))
+            end
+        end
+        until c=="\13"
+    end
+    local input = sub(t, 1, 20)
+    local words = split(input, " ",false)
+    local twow, firstw, secondw_ext, secondw
+    if #words > 0 then
+        firstw = sub(words[1], 1, 5)
+        if #words > 1 then
+            twow = 1
+            secondw = sub(words[2], 1, 5)
+            secondw_ext = sub(words[2], 6, 20)
             if #secondw_ext == 0 then secondw_ext = ' ' end
         else
             twow = 0
@@ -398,7 +443,7 @@ end\n
             if isinstance(n, ReadStatement): self.emit_read(n); continue
             if isinstance(n, FormatPattern): continue
             if isinstance(n, Continue): self.output(f'goto c{str(self.continue_id_stack[-1]).zfill(5)}\n'); continue
-            if isinstance(n, Stop) or isinstance(n, ExitProgram): self.output('os.exit()\n'); continue
+            if isinstance(n, Stop) or isinstance(n, ExitProgram): self.output('os.exit()\n' if not PICO8 else 'stop()\n'); continue
             if isinstance(n, Pause): self.output(f'PAUSE("{n.msg}")\n'); continue
             if isinstance(n, TypeStatement): self.emit_write(n); continue
             if isinstance(n, Subroutine): self.emit_subroutine(n); continue
@@ -428,12 +473,293 @@ end\n
         for node in self.ast:
             emit(node, ignore=[GlobalVarDef, Subroutine])
     
-    def emit_file_hex(self, file_id):
-        pass
-
 def export_cartridge(ast, datfilename):
     emitter = Emitter(ast, [datfilename], output='cca.lua')
-    header = """
+    header = ''
+    if PICO8:
+        header = """
+
+-- https://www.lexaloffle.com/bbs/?tid=41798
+function cat(t)
+local s = ''
+for i=1,#t,1 do
+    s = s .. t[i]
+end
+return s
+end
+
+local basedictcompress = {}
+local basedictdecompress = {}
+for i = 0, 255 do
+    local ic, iic = chr(i), chr(i, 0)
+    basedictcompress[ic] = iic
+    basedictdecompress[iic] = ic
+end
+
+local function dictAddA(str, dict, a, b)
+    if a >= 256 then
+        a, b = 0, b+1
+        if b >= 256 then
+            dict = {}
+            b = 1
+        end
+    end
+    dict[str] = chr(a,b)
+    a = a+1
+    return dict, a, b
+end
+
+local function compress(input)
+    if type(input) ~= "string" then
+        return nil, "string expected, got "..type(input)
+    end
+    local len = #input
+    if len <= 1 then
+        return "u"..input
+    end
+
+    local dict = {}
+    local a, b = 0, 1
+
+    local result = {"c"}
+    local resultlen = 1
+    local n = 2
+    local word = ""
+    for i = 1, len do
+        local c = sub(input, i, i)
+        local wc = word..c
+        if not (basedictcompress[wc] or dict[wc]) then
+            local write = basedictcompress[word] or dict[word]
+            if not write then
+                return nil, "algorithm error, could not fetch word"
+            end
+            result[n] = write
+            resultlen = resultlen + #write
+            n = n+1
+            if  len <= resultlen then
+                return "u"..input
+            end
+            dict, a, b = dictAddA(wc, dict, a, b)
+            word = c
+        else
+            word = wc
+        end
+    end
+    result[n] = basedictcompress[word] or dict[word]
+    resultlen = resultlen+#result[n]
+    n = n+1
+    if  len <= resultlen then
+        return "u"..input
+    end
+    return cat(result)
+end
+
+local function dictAddB(str, dict, a, b)
+    if a >= 256 then
+        a, b = 0, b+1
+        if b >= 256 then
+            dict = {}
+            b = 1
+        end
+    end
+    dict[chr(a,b)] = str
+    a = a+1
+    return dict, a, b
+end
+
+local function decompress(input)
+    if type(input) ~= "string" then
+        error("string expected, got "..type(input))
+    end
+
+    if #input < 1 then
+        error("invalid input - not a compressed string")
+    end
+
+    local control = sub(input, 1, 1)
+    if control == "u" then
+        return sub(input, 2)
+    elseif control ~= "c" then
+        error("invalid input - not a compressed string")
+    end
+    input = sub(input, 2)
+    local len = #input
+
+    if len < 2 then
+        error("invalid input - not a compressed string")
+    end
+
+    local dict = {}
+    local a, b = 0, 1
+
+    local result = {}
+    local n = 1
+    local last = sub(input, 1, 2)
+    result[n] = basedictdecompress[last] or dict[last]
+    n = n+1
+    for i = 3, len, 2 do
+        local code = sub(input, i, i+1)
+        local lastStr = basedictdecompress[last] or dict[last]
+        if not lastStr then
+            error("could not find last from dict. Invalid input?")
+        end
+        local toAdd = basedictdecompress[code] or dict[code]
+        if toAdd then
+            result[n] = toAdd
+            n = n+1
+            dict, a, b = dictAddB(lastStr..sub(toAdd, 1, 1), dict, a, b)
+        else
+            local tmp = lastStr..sub(lastStr, 1, 1)
+            result[n] = tmp
+            n = n+1
+            dict, a, b = dictAddB(tmp, dict, a, b)
+        end
+        last = code
+    end
+    return cat(result)
+end
+
+-- https://stackoverflow.com/a/18694774
+function utf8_from(t)
+  local bytearr = {}
+  for i = 1,#t,1 do
+    add(bytearr, chr(t[i]))
+    --if i < 40 then print(chr(t[i]),1 + 4 * (i - 1),1) end
+  end
+  return cat(bytearr)
+end
+
+cls()
+
+-- __gfx__ + __map__ --
+READ_UTF8_DATA = {}
+for i = 0,0x2fff,1 do
+    add(READ_UTF8_DATA, peek(i))
+end
+
+-- __sfx__ --
+for i = 0x3200,0x3200 + 843 - 1,1 do
+    add(READ_UTF8_DATA, peek(i))
+end
+print(tostr(#READ_UTF8_DATA),1,9)
+COMPRESSED = utf8_from(READ_UTF8_DATA)
+DECOMPRESSED = decompress(COMPRESSED)
+print(sub(DECOMPRESSED,#DECOMPRESSED - 20,#DECOMPRESSED),1,18)
+
+READ_LINES = split(DECOMPRESSED,"|",false)
+
+--cstore(0x3200, 0x0000, 4096)
+
+function INIT_ARR1(size)
+    local a = {}
+    for i = 1, size do
+        a[i] = 0
+    end
+    return a
+end
+
+function INIT_ARR2(size1, size2)
+    local a = {}
+    for i = 1, size1 do
+        a[i] = {}
+        for j = 1, size2 do
+            a[i][j] = 0
+        end
+    end
+    return a
+end
+
+-- https://www.lexaloffle.com/bbs/?tid=31598
+asci="\\1\\2\\3\\4\\5\\6\\7\\8\\9\\10\\11\\12\\13\\14\\15\\16\\17\\18\\19\\20\\21\\22\\23\\24\\25\\26\\27\\28\\29\\30\\31\\32\\33\\34\\35\\36\\37\\38\\39\\40\\41\\42\\43\\44\\45\\46\\47\\48\\49\\50\\51\\52\\53\\54\\55\\56\\57\\58\\59\\60\\61\\62\\63\\64\\65\\66\\67\\68\\69\\70\\71\\72\\73\\74\\75\\76\\77\\78\\79\\80\\81\\82\\83\\84\\85\\86\\87\\88\\89\\90\\91\\92\\93\\94\\95\\96\\97\\98\\99\\100\\101\\102\\103\\104\\105\\106\\107\\108\\109\\110\\111\\112\\113\\114\\115\\116\\117\\118\\119\\120\\121\\122\\123\\124\\125\\126\\127\\128\\129\\130\\131\\132\\133\\134\\135\\136\\137\\138\\139\\140\\141\\142\\143\\144\\145\\146\\147\\148\\149\\150\\151\\152\\153\\154\\155\\156\\157\\158\\159\\160\\161\\162\\163\\164\\165\\166\\167\\168\\169\\170\\171\\172\\173\\174\\175\\176\\177\\178\\179\\180\\181\\182\\183\\184\\185\\186\\187\\188\\189\\190\\191\\192\\193\\194\\195\\196\\197\\198\\199\\200\\201\\202\\203\\204\\205\\206\\207\\208\\209\\210\\211\\212\\213\\214\\215\\216\\217\\218\\219\\220\\221\\222\\223\\224\\225\\226\\227\\228\\229\\230\\231\\232\\233\\234\\235\\236\\237\\238\\239\\240\\241\\242\\243\\244\\245\\246\\247\\248\\249\\250\\251\\252\\253\\254\\255"
+
+cls()
+print(ins,8,8,5)
+spr(1,60,16)
+poke(24365,1) -- mouse+key kit
+
+t=""
+
+-->8
+-- functions ------------------
+
+-- grect: draw proper rectangle
+function grect(h,v,x,y,c)
+  rectfill(h,v,h+x-1,v+y-1,c)
+end --grect(.)
+
+-- return string minus last chr
+function fnd(a)
+  return sub(a,1,#a-1)
+end--fnd(.)
+
+-- len: return string length
+function len(a)
+  return #a
+end -- len(.)
+
+-- return pos # of str b in a
+function instr(a,b)
+local r=0
+  if (a==null or a=="") return 0
+  if (b==null or b=="") return 0
+  for i=1,#a-#b+1 do
+    if sub(a,i,i+#b-1)==b then
+      r=i
+      return r
+    end
+  end
+  return 0
+end --instr(.)
+
+-- return ascii id of character
+function asc(a)
+  return instr(asci,a)
+end --asc(.)
+
+function PAUSE(msg)
+    cls()
+    print(msg)
+end
+
+READ_LINE_IDX = 1
+
+function FORTRAN_READ(types, units)
+    local line = READ_LINES[READ_LINE_IDX]
+    local result = {}
+    for i=1,#types,1 do
+        local t = types[i]
+        local u = units[i]
+        for j=1,u,1 do
+            if t == "G" then
+                local v = tonum(sub(line, 1, 5))
+                if v == nil or v == '' then
+                    v = 0
+                end
+                add(result, v)
+                line = sub(line, 6, #line)
+            elseif t == "A5" then
+                add(result, sub(line, 1, 5))
+                line = sub(line, 6, #line)
+            else
+                error("Unsupported format type " .. t)
+            end
+        end
+    end
+    READ_LINE_IDX = READ_LINE_IDX + 1
+    return result
+end
+
+function FORTRAN_WRITE(text)
+    cls()
+    print(text)
+end
+"""
+    else:
+        header += """
+unpack = table.unpack
+sub = string.sub
+add = table.insert
+
 -- http://lua-users.org/wiki/FileInputOutput
 
 -- see if the file exists
@@ -491,15 +817,15 @@ function FORTRAN_READ(types, units)
         local u = units[i]
         for j=1,u,1 do
             if t == "G" then
-                local v = tonumber(string.sub(line, 1, 5))
+                local v = tonumber(sub(line, 1, 5))
                 if v == nil or v == '' then
                     v = 0
                 end
-                table.insert(result, v)
-                line = string.sub(line, 6, #line)
+                add(result, v)
+                line = sub(line, 6, #line)
             elseif t == "A5" then
-                table.insert(result, string.sub(line, 1, 5))
-                line = string.sub(line, 6, #line)
+                add(result, sub(line, 1, 5))
+                line = sub(line, 6, #line)
             else
                 error("Unsupported format type " .. t)
             end
@@ -513,6 +839,6 @@ function FORTRAN_WRITE(text)
     io.write(text)
 end
 """
+
     lua = emitter.emit_lua(header)
-    gfx_hex = emitter.emit_file_hex(1)
     pass
