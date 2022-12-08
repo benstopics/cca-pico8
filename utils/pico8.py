@@ -2,7 +2,7 @@ from utils.parser.models import *
 import os
 
 LOCAL_KEYWORD = 'local'
-PICO8 = True
+PICO8 = False
 
 logical_ops = {
     'AND': ' and ',
@@ -74,7 +74,7 @@ class Emitter:
             return self
         if isinstance(expr, ArithmeticExpr):
             if expr.op == '/':
-                self.output('math.floor')
+                self.output('math.floor' if not PICO8 else 'flr')
             self.output('(')
             self.emit_expr(expr.lterm)
             self.output(expr.op)
@@ -123,6 +123,10 @@ class Emitter:
     
     def emit_goto(self, goto: Goto):
         if len(goto.stmt_ids) == 1:
+            if PICO8:
+                self.output(f'printh("goto " .. {str(goto.stmt_ids[0]).zfill(5)})\n')
+            else:
+                self.output(f'io.write("goto " .. {str(goto.stmt_ids[0]).zfill(5)} .. "\\n")\n')
             self.output(f'goto l{str(goto.stmt_ids[0]).zfill(5)}\n')
             return
         
@@ -134,6 +138,10 @@ class Emitter:
             if i > 0:
                 self.output('else')
             self.output(f'if ({mname}=={i + 1}) then\n')
+            if PICO8:
+                self.output(f'printh("goto " .. {str(goto.stmt_ids[i]).zfill(5)})\n')
+            else:
+                self.output(f'io.write("goto " .. {str(goto.stmt_ids[i]).zfill(5)} .. "\\n")\n')
             self.output(f'goto l{str(goto.stmt_ids[i]).zfill(5)}\n')
             if i == len(goto.stmt_ids) - 1:
                 self.output('end\n')
@@ -324,31 +332,69 @@ class Emitter:
 end\n
 """)
             else:
-                self.output("""    for i=0,10,1 do
-        print("type in some text:",28,100,11)
-        repeat
-        grect(0,108,128,5)
-        print(t,64-len(t)*2,108,6)
-        grect(64+len(t)*2,108,3,5,8)
-        flip()
-        grect(64+len(t)*2,108,3,5,0)
-        if stat(30)==true then
-            c=stat(31)
-            if c>=" " and c<="z" then
-            t=t..c
-            elseif c=="\8" then
-            t=fnd(t)
-            elseif c!="\13" then
-            cls()
-            color(7)
-            print("raw key:")
-            print(asc(c))
+                self.output("""
+-- Render screen
+    DRAW_SCREEN()
+
+    kb_chars_alnum = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
+    BACKSPACE_SCANCODE = 42
+    SPACE_SCANCODE = 44
+    ENTER_SCANCODE = 88
+
+    t = ''
+    key_states = {}
+    enter_pressed = false
+    while true do
+        pressed_key = 0
+
+        -- Update enter keypress
+        local enter_was_pressed = enter_pressed
+        local enter_pressed = stat(31) == "\\r"
+        if enter_pressed and not enter_was_pressed then
+            pressed_key = 88
+        else
+            -- Update alphanum pressed statuses
+            for scancode = 4, 256, 1 do
+                local was_pressed = key_states[scancode]
+                local pressed = stat(28, scancode)
+                key_states[scancode] = pressed
+
+                -- if pressed then print(scancode, 1, 1, 11) end
+
+                -- Initial press only
+                if pressed and not was_pressed then
+                    pressed_key = scancode
+                    break
+                end
             end
         end
-        until c=="\13"
+
+        -- Manage input line
+        if pressed_key >= 4 and pressed_key <= 39 and #t < 20 then
+            t = t .. sub(kb_chars_alnum, pressed_key - 3, pressed_key - 3)
+        elseif pressed_key == SPACE_SCANCODE and sub(t, #t, #t) ~= " " then
+            t = t .. " "
+        elseif pressed_key == BACKSPACE_SCANCODE and #t > 0 then
+            t = sub(t, 1, #t - 1)
+        elseif pressed_key == ENTER_SCANCODE then
+            break
+        end
+
+        -- Draw user input
+        rectfill(0, 6 * (#SCREEN_TEXT), 127,6 * (#SCREEN_TEXT + 1), 0)
+        local show_cursor = time() % 1 < 0.5
+        local cursor = ""
+        if show_cursor then cursor = "_" else show_cursor = " " end
+        print(">" .. t .. cursor .. "                                      ", 0, 6 * (#SCREEN_TEXT), 11)
+        flip()
+
+        -- https://www.lexaloffle.com/bbs/?tid=41855
+        poke(0x5f30, 1) -- prevents the p character or the enter key from calling the menu.
     end
     local input = sub(t, 1, 20)
-    local words = split(input, " ",false)
+    FORTRAN_WRITE(sub("\\n>" .. input .. "                                      ",1,21) .. "\\n\\n")
+    --print(input)
+    local words = split(input, " ", false)
     local twow, firstw, secondw_ext, secondw
     if #words > 0 then
         firstw = sub(words[1], 1, 5)
@@ -363,7 +409,8 @@ end\n
             secondw_ext = ' '
         end
     end
-    return {twow, firstw, secondw, secondw_ext}
+    return { twow, firstw, secondw, secondw_ext }
+
 end\n
 """)
             return
@@ -479,13 +526,45 @@ def export_cartridge(ast, datfilename):
     if PICO8:
         header = """
 
+-- https://www.lexaloffle.com/bbs/?pid=43636
+-- converts anything to string, even nested tables
+function tostring(any)
+    if type(any)=="function" then 
+        return "function" 
+    end
+    if any==nil then 
+        return "nil" 
+    end
+    if type(any)=="string" then
+        return any
+    end
+    if type(any)=="boolean" then
+        if any then return "true" end
+        return "false"
+    end
+    if type(any)=="table" then
+        local str = "{ "
+        for k,v in pairs(any) do
+            str=str..tostring(k).."->"..tostring(v).." "
+        end
+        return str.."}"
+    end
+    if type(any)=="number" then
+        return ""..any
+    end
+    return "unkown" -- should never show
+end
+cls()
+
+poke(0x5f2d, 1) -- Enable keyboard/mouse
+
 -- https://www.lexaloffle.com/bbs/?tid=41798
 function cat(t)
-local s = ''
-for i=1,#t,1 do
-    s = s .. t[i]
-end
-return s
+    local s = ''
+    for i = 1, #t, 1 do
+        s = s .. t[i]
+    end
+    return s
 end
 
 local basedictcompress = {}
@@ -498,36 +577,36 @@ end
 
 local function dictAddA(str, dict, a, b)
     if a >= 256 then
-        a, b = 0, b+1
+        a, b = 0, b + 1
         if b >= 256 then
             dict = {}
             b = 1
         end
     end
-    dict[str] = chr(a,b)
-    a = a+1
+    dict[str] = chr(a, b)
+    a = a + 1
     return dict, a, b
 end
 
 local function compress(input)
     if type(input) ~= "string" then
-        return nil, "string expected, got "..type(input)
+        return nil, "string expected, got " .. type(input)
     end
     local len = #input
     if len <= 1 then
-        return "u"..input
+        return "u" .. input
     end
 
     local dict = {}
     local a, b = 0, 1
 
-    local result = {"c"}
+    local result = { "c" }
     local resultlen = 1
     local n = 2
     local word = ""
     for i = 1, len do
         local c = sub(input, i, i)
-        local wc = word..c
+        local wc = word .. c
         if not (basedictcompress[wc] or dict[wc]) then
             local write = basedictcompress[word] or dict[word]
             if not write then
@@ -535,9 +614,9 @@ local function compress(input)
             end
             result[n] = write
             resultlen = resultlen + #write
-            n = n+1
-            if  len <= resultlen then
-                return "u"..input
+            n = n + 1
+            if len <= resultlen then
+                return "u" .. input
             end
             dict, a, b = dictAddA(wc, dict, a, b)
             word = c
@@ -546,30 +625,30 @@ local function compress(input)
         end
     end
     result[n] = basedictcompress[word] or dict[word]
-    resultlen = resultlen+#result[n]
-    n = n+1
-    if  len <= resultlen then
-        return "u"..input
+    resultlen = resultlen + #result[n]
+    n = n + 1
+    if len <= resultlen then
+        return "u" .. input
     end
     return cat(result)
 end
 
 local function dictAddB(str, dict, a, b)
     if a >= 256 then
-        a, b = 0, b+1
+        a, b = 0, b + 1
         if b >= 256 then
             dict = {}
             b = 1
         end
     end
-    dict[chr(a,b)] = str
-    a = a+1
+    dict[chr(a, b)] = str
+    a = a + 1
     return dict, a, b
 end
 
 local function decompress(input)
     if type(input) ~= "string" then
-        error("string expected, got "..type(input))
+        error("string expected, got " .. type(input))
     end
 
     if #input < 1 then
@@ -596,9 +675,9 @@ local function decompress(input)
     local n = 1
     local last = sub(input, 1, 2)
     result[n] = basedictdecompress[last] or dict[last]
-    n = n+1
+    n = n + 1
     for i = 3, len, 2 do
-        local code = sub(input, i, i+1)
+        local code = sub(input, i, i + 1)
         local lastStr = basedictdecompress[last] or dict[last]
         if not lastStr then
             error("could not find last from dict. Invalid input?")
@@ -606,12 +685,12 @@ local function decompress(input)
         local toAdd = basedictdecompress[code] or dict[code]
         if toAdd then
             result[n] = toAdd
-            n = n+1
-            dict, a, b = dictAddB(lastStr..sub(toAdd, 1, 1), dict, a, b)
+            n = n + 1
+            dict, a, b = dictAddB(lastStr .. sub(toAdd, 1, 1), dict, a, b)
         else
-            local tmp = lastStr..sub(lastStr, 1, 1)
+            local tmp = lastStr .. sub(lastStr, 1, 1)
             result[n] = tmp
-            n = n+1
+            n = n + 1
             dict, a, b = dictAddB(tmp, dict, a, b)
         end
         last = code
@@ -621,32 +700,30 @@ end
 
 -- https://stackoverflow.com/a/18694774
 function utf8_from(t)
-  local bytearr = {}
-  for i = 1,#t,1 do
-    add(bytearr, chr(t[i]))
-    --if i < 40 then print(chr(t[i]),1 + 4 * (i - 1),1) end
-  end
-  return cat(bytearr)
+    local bytearr = {}
+    for i = 1, #t, 1 do
+        add(bytearr, chr(t[i]))
+        --if i < 40 then print(chr(t[i]),1 + 4 * (i - 1),1) end
+    end
+    return cat(bytearr)
 end
-
-cls()
 
 -- __gfx__ + __map__ --
 READ_UTF8_DATA = {}
-for i = 0,0x2fff,1 do
+for i = 0, 0x2fff, 1 do
     add(READ_UTF8_DATA, peek(i))
 end
 
 -- __sfx__ --
-for i = 0x3200,0x3200 + 843 - 1,1 do
+for i = 0x3200, 0x3200 + 843 - 1, 1 do
     add(READ_UTF8_DATA, peek(i))
 end
-print(tostr(#READ_UTF8_DATA),1,9)
+--print(tostr(#READ_UTF8_DATA),1,9)
 COMPRESSED = utf8_from(READ_UTF8_DATA)
 DECOMPRESSED = decompress(COMPRESSED)
-print(sub(DECOMPRESSED,#DECOMPRESSED - 20,#DECOMPRESSED),1,18)
+--print(sub(DECOMPRESSED,#DECOMPRESSED - 20,#DECOMPRESSED),1,18)
 
-READ_LINES = split(DECOMPRESSED,"|",false)
+READ_LINES = split(DECOMPRESSED, "|", false)
 
 --cstore(0x3200, 0x0000, 4096)
 
@@ -669,67 +746,15 @@ function INIT_ARR2(size1, size2)
     return a
 end
 
--- https://www.lexaloffle.com/bbs/?tid=31598
-asci="\\1\\2\\3\\4\\5\\6\\7\\8\\9\\10\\11\\12\\13\\14\\15\\16\\17\\18\\19\\20\\21\\22\\23\\24\\25\\26\\27\\28\\29\\30\\31\\32\\33\\34\\35\\36\\37\\38\\39\\40\\41\\42\\43\\44\\45\\46\\47\\48\\49\\50\\51\\52\\53\\54\\55\\56\\57\\58\\59\\60\\61\\62\\63\\64\\65\\66\\67\\68\\69\\70\\71\\72\\73\\74\\75\\76\\77\\78\\79\\80\\81\\82\\83\\84\\85\\86\\87\\88\\89\\90\\91\\92\\93\\94\\95\\96\\97\\98\\99\\100\\101\\102\\103\\104\\105\\106\\107\\108\\109\\110\\111\\112\\113\\114\\115\\116\\117\\118\\119\\120\\121\\122\\123\\124\\125\\126\\127\\128\\129\\130\\131\\132\\133\\134\\135\\136\\137\\138\\139\\140\\141\\142\\143\\144\\145\\146\\147\\148\\149\\150\\151\\152\\153\\154\\155\\156\\157\\158\\159\\160\\161\\162\\163\\164\\165\\166\\167\\168\\169\\170\\171\\172\\173\\174\\175\\176\\177\\178\\179\\180\\181\\182\\183\\184\\185\\186\\187\\188\\189\\190\\191\\192\\193\\194\\195\\196\\197\\198\\199\\200\\201\\202\\203\\204\\205\\206\\207\\208\\209\\210\\211\\212\\213\\214\\215\\216\\217\\218\\219\\220\\221\\222\\223\\224\\225\\226\\227\\228\\229\\230\\231\\232\\233\\234\\235\\236\\237\\238\\239\\240\\241\\242\\243\\244\\245\\246\\247\\248\\249\\250\\251\\252\\253\\254\\255"
-
-cls()
-print(ins,8,8,5)
-spr(1,60,16)
-poke(24365,1) -- mouse+key kit
-
-t=""
-
--->8
--- functions ------------------
-
--- grect: draw proper rectangle
-function grect(h,v,x,y,c)
-  rectfill(h,v,h+x-1,v+y-1,c)
-end --grect(.)
-
--- return string minus last chr
-function fnd(a)
-  return sub(a,1,#a-1)
-end--fnd(.)
-
--- len: return string length
-function len(a)
-  return #a
-end -- len(.)
-
--- return pos # of str b in a
-function instr(a,b)
-local r=0
-  if (a==null or a=="") return 0
-  if (b==null or b=="") return 0
-  for i=1,#a-#b+1 do
-    if sub(a,i,i+#b-1)==b then
-      r=i
-      return r
-    end
-  end
-  return 0
-end --instr(.)
-
--- return ascii id of character
-function asc(a)
-  return instr(asci,a)
-end --asc(.)
-
-function PAUSE(msg)
-    cls()
-    print(msg)
-end
-
 READ_LINE_IDX = 1
 
 function FORTRAN_READ(types, units)
     local line = READ_LINES[READ_LINE_IDX]
     local result = {}
-    for i=1,#types,1 do
+    for i = 1, #types, 1 do
         local t = types[i]
         local u = units[i]
-        for j=1,u,1 do
+        for j = 1, u, 1 do
             if t == "G" then
                 local v = tonum(sub(line, 1, 5))
                 if v == nil or v == '' then
@@ -749,9 +774,46 @@ function FORTRAN_READ(types, units)
     return result
 end
 
+SCREEN_TEXT = { '' }
+MAX_SCREEN_WIDTH = 32
+MAX_SCREEN_LINES = 20
 function FORTRAN_WRITE(text)
+    -- Add new text to buffer with wordwrap
+    for c = 1, #text, 1 do
+        if sub(text, c, c) == "\\n" then
+            add(SCREEN_TEXT, '')
+        else
+            if #SCREEN_TEXT[#SCREEN_TEXT] == MAX_SCREEN_WIDTH then
+                add(SCREEN_TEXT, '')
+            end
+            SCREEN_TEXT[#SCREEN_TEXT] = SCREEN_TEXT[#SCREEN_TEXT] .. sub(text, c, c)
+        end
+
+        while #SCREEN_TEXT > MAX_SCREEN_LINES do
+            st = {}
+            for r = 2, #SCREEN_TEXT, 1 do
+                add(st, SCREEN_TEXT[r])
+            end
+            SCREEN_TEXT = st
+        end
+    end
+end
+function DRAW_SCREEN()
+    -- Clear screen
     cls()
-    print(text)
+
+    -- Draw game text
+    for r = 1, #SCREEN_TEXT, 1 do
+        for c = 1, #SCREEN_TEXT[r], 1 do
+            print(SCREEN_TEXT[r], 0, (r - 1) * 6, 11)
+        end
+    end
+end
+
+function PAUSE(msg)
+    FORTRAN_WRITE(msg .. "\\n")
+    DRAW_SCREEN()
+    GETIN(_, _, _, _)
 end
 """
     else:
