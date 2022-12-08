@@ -23,22 +23,25 @@ class ArrayDef:
         self.dims = dims
 
 class ArithmeticExpr:
-    def __init__(self, lterm, op, rterm):
+    def __init__(self, lterm, op, rterm, paren=False):
         self.lterm = lterm
         self.op = op
         self.rterm = rterm
+        self.paren = paren
 
 class RelationalExpr:
-    def __init__(self, lterm, op, rterm):
+    def __init__(self, lterm, op, rterm, paren=False):
         self.lterm = lterm
         self.op = op
         self.rterm = rterm
+        self.paren = paren
 
 class LogicalExpr:
-    def __init__(self, lterm, op, rterm):
+    def __init__(self, lterm, op, rterm, paren=False):
         self.lterm = lterm
         self.op = op
         self.rterm = rterm
+        self.paren = paren
 
 class LogicalIfStatement:
     def __init__(self, cond, stmt):

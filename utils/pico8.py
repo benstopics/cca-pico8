@@ -2,7 +2,7 @@ from utils.parser.models import *
 import os
 
 LOCAL_KEYWORD = 'local'
-PICO8 = False
+PICO8 = True
 
 logical_ops = {
     'AND': ' and ',
@@ -16,6 +16,14 @@ relational_ops = {
     'LT': '<',
     'GE': '>=',
     'LE': '<='
+}
+
+arithmetic_fns = {
+    '*': 'stringmul',
+    '/': 'stringdiv',
+    '+': 'stringadd',
+    '-': 'stringsub',
+    '%': 'stringmod',
 }
 
 class Emitter:
@@ -59,38 +67,63 @@ class Emitter:
     
     def emit_expr(self, expr):
         if isinstance(expr, LogicalExpr):
-            self.output('(')
+            if getattr(expr, 'paren', False):
+                self.output('(')
             self.emit_expr(expr.lterm)
             self.output(logical_ops[expr.op])
             self.emit_expr(expr.rterm)
-            self.output(')')
+            if getattr(expr, 'paren', False):
+                self.output(')')
             return self
         if isinstance(expr, RelationalExpr):
-            self.output('(')
+            tonum = (
+                (not isinstance(expr.lterm, str) and not isinstance(expr.rterm, str))
+                and expr.op != 'EQ'
+                and expr.op != 'NE'
+            )
+            if getattr(expr, 'paren', False):
+                self.output('(')
+            if tonum:
+                self.output('tonum(')
             self.emit_expr(expr.lterm)
+            if tonum:
+                if PICO8:
+                    self.output(', 2)')
+                else:
+                    self.output(')')
             self.output(relational_ops[expr.op])
+            if tonum:
+                self.output('tonum(')
             self.emit_expr(expr.rterm)
-            self.output(')')
+            if tonum:
+                if PICO8:
+                    self.output(', 2)')
+                else:
+                    self.output(')')
+            if getattr(expr, 'paren', False):
+                self.output(')')
             return self
         if isinstance(expr, ArithmeticExpr):
-            if expr.op == '/':
-                self.output('math.floor' if not PICO8 else 'flr')
+            self.output(arithmetic_fns[expr.op])
             self.output('(')
             self.emit_expr(expr.lterm)
-            self.output(expr.op)
+            self.output(',')
             self.emit_expr(expr.rterm)
             self.output(')')
             return self
         if isinstance(expr, Modulo):
+            self.output(arithmetic_fns['%'])
             self.output('(')
             self.emit_expr(expr.quotient)
-            self.output('%')
+            self.output(',')
             self.emit_expr(expr.divisor)
             self.output(')')
             return self
         if isinstance(expr, NegateExpr):
-            self.output('-')
+            self.output('stringneg')
+            self.output('(')
             self.emit_expr(expr.expr)
+            self.output(')')
             return self
         if (
             isinstance(expr, VariableRef)
@@ -102,7 +135,7 @@ class Emitter:
             isinstance(expr, int)
             or isinstance(expr, float)
         ):
-            self.output(str(expr))
+            self.output(f'"{str(expr)}"')
             return self
         if isinstance(expr, str):
             s = expr.replace("\n", "\\n")
@@ -123,10 +156,10 @@ class Emitter:
     
     def emit_goto(self, goto: Goto):
         if len(goto.stmt_ids) == 1:
-            if PICO8:
-                self.output(f'printh("goto " .. {str(goto.stmt_ids[0]).zfill(5)})\n')
-            else:
-                self.output(f'io.write("goto " .. {str(goto.stmt_ids[0]).zfill(5)} .. "\\n")\n')
+            # if PICO8:
+            #     self.output(f'printh("goto " .. {str(goto.stmt_ids[0]).zfill(5)})\n')
+            # else:
+            #     self.output(f'io.write("goto " .. {str(goto.stmt_ids[0]).zfill(5)} .. "\\n")\n')
             self.output(f'goto l{str(goto.stmt_ids[0]).zfill(5)}\n')
             return
         
@@ -137,11 +170,11 @@ class Emitter:
         for i in range(len(goto.stmt_ids)):
             if i > 0:
                 self.output('else')
-            self.output(f'if ({mname}=={i + 1}) then\n')
-            if PICO8:
-                self.output(f'printh("goto " .. {str(goto.stmt_ids[i]).zfill(5)})\n')
-            else:
-                self.output(f'io.write("goto " .. {str(goto.stmt_ids[i]).zfill(5)} .. "\\n")\n')
+            self.output(f'if ({mname}=="{i + 1}") then\n')
+            # if PICO8:
+            #     self.output(f'printh("goto " .. {str(goto.stmt_ids[i]).zfill(5)})\n')
+            # else:
+            #     self.output(f'io.write("goto " .. {str(goto.stmt_ids[i]).zfill(5)} .. "\\n")\n')
             self.output(f'goto l{str(goto.stmt_ids[i]).zfill(5)}\n')
             if i == len(goto.stmt_ids) - 1:
                 self.output('end\n')
@@ -154,9 +187,9 @@ class Emitter:
         
         if isinstance(mem_ref, ArrayRef):
             self.output(mem_ref.name)
-            self.output('[')
-            self.output(']['.join([Emitter().emit_expr(i).output_buffer for i in mem_ref.indexes]))
-            self.output(']')
+            self.output('[tonum(')
+            self.output(')][tonum('.join([Emitter().emit_expr(i).output_buffer for i in mem_ref.indexes]))
+            self.output(')]')
             return
         
         raise Exception('Invalid reference')
@@ -178,11 +211,11 @@ class Emitter:
         self.output('}\n')
         
         if isinstance(arr_assign.loc_ref, ArrayRefRange):
-            self.output(f'for {arr_assign.loc_ref.counter_name}=')
+            self.output(f'for {arr_assign.loc_ref.counter_name}=tonum(')
             self.emit_expr(arr_assign.loc_ref.start_expr)
-            self.output(',')
+            self.output('),tonum(')
             self.emit_expr(arr_assign.loc_ref.stop_expr)
-            self.output(',1 do\n')
+            self.output(') do\n')
             self.emit_memory_ref(arr_assign.loc_ref.array_loc_ref)
             self.output(f'={vname}[{arr_assign.loc_ref.counter_name}]\n')
             self.output('end\n')
@@ -190,7 +223,7 @@ class Emitter:
         
         if isinstance(arr_assign.loc_ref, VariableRef):
             iname = f'ASSIGN_I{self.get_unique_id()}'
-            self.output(f'for {iname}=1,{len(arr_assign.value_exprs)},1 do\n')
+            self.output(f'for {iname}=1,{len(arr_assign.value_exprs)} do\n')
             self.output(f'{arr_assign.loc_ref.name}[{iname}]={vname}[{iname}]\n')
             self.output('end\n')
             return
@@ -201,15 +234,15 @@ class Emitter:
         if continue_id is None:
             continue_id = self.get_unique_id()
         self.continue_id_stack.append(continue_id)
-        self.output(f'{forloop.counter_name}=')
+        self.output(f'{forloop.counter_name}=stringsub(')
         self.emit_expr(forloop.start_expr)
-        self.output(' - 1\n')
+        self.output(',"1")\n')
         forloop_id = self.get_unique_id()
         self.output(f'::c{continue_id.zfill(5)}::\n')
-        self.output(f'{forloop.counter_name} = {forloop.counter_name} + 1\n')
-        self.output(f'if {forloop.counter_name} > ')
+        self.output(f'{forloop.counter_name} = stringadd({forloop.counter_name},"1")\n')
+        self.output(f'if tonum({forloop.counter_name}) > tonum(')
         self.emit_expr(forloop.stop_expr)
-        self.output(f' then goto f{forloop_id.zfill(5)} end\n')
+        self.output(f') then goto f{forloop_id.zfill(5)} end\n')
         for body_stmt in forloop.body_stmts:
             self.emit_statement(body_stmt)
         self.output(f'goto c{continue_id.zfill(5)}\n')
@@ -239,7 +272,7 @@ class Emitter:
         units = ','.join([f'{f.units or 1}' for f in read.formats])
         self.output(f'{vname}=FORTRAN_READ(' + '{' + types + '},{' + units + '})\n')
         iname = f'WRITE_I{self.get_unique_id()}'
-        self.output(f'{iname}=1\n')
+        self.output(f'{iname}="1"\n')
 
         for mem_ref in read.memory_refs:
             if (
@@ -247,19 +280,19 @@ class Emitter:
                 or isinstance(mem_ref, ArrayRef)
             ):
                 self.emit_memory_ref(mem_ref)
-                self.output(f'={vname}[{iname}]\n')
-                self.output(f'{iname} = {iname} + 1\n')
+                self.output(f'={vname}[tonum({iname})]\n')
+                self.output(f'{iname} = stringadd({iname},"1")\n')
                 continue
             if isinstance(mem_ref, ArrayRefRange):
-                self.output(f'for {mem_ref.counter_name}=')
+                self.output(f'for {mem_ref.counter_name}=tonum(')
                 self.emit_expr(mem_ref.start_expr)
-                self.output(',')
+                self.output('),tonum(')
                 self.emit_expr(mem_ref.stop_expr)
-                self.output(',1 do\n')
-                self.output(f'if type({vname}[{iname}]) == "string" and #{vname}[{iname}] == 0 then {vname}[{iname}] = " " end\n')
+                self.output(') do\n')
+                self.output(f'if tonum({vname}[tonum({iname})]) == nil and #{vname}[tonum({iname})] == "0" then {vname}[tonum({iname})] = " " end\n')
                 self.emit_memory_ref(mem_ref.array_loc_ref)
-                self.output(f'={vname}[{iname}]\n')
-                self.output(f'{iname} = {iname} + 1\n')
+                self.output(f'={vname}[tonum({iname})]\n')
+                self.output(f'{iname} = stringadd({iname},"1")\n')
                 self.output('end\n')
                 return
             
@@ -271,11 +304,11 @@ class Emitter:
             and isinstance(write.value_list[0], ArrayRefRange)
         ):
             array_ref_range: ArrayRefRange = write.value_list[0]
-            self.output(f'for {array_ref_range.counter_name}=')
+            self.output(f'for {array_ref_range.counter_name}=tonum(')
             self.emit_expr(array_ref_range.start_expr)
-            self.output(',')
+            self.output('),tonum(')
             self.emit_expr(array_ref_range.stop_expr)
-            self.output(',1 do\nFORTRAN_WRITE(')
+            self.output(') do\nFORTRAN_WRITE(')
             self.emit_memory_ref(array_ref_range.array_loc_ref)
             self.output(f')\n')
             self.output('end\n')
@@ -318,12 +351,12 @@ class Emitter:
     if #words > 0 then
         firstw = sub(words[1], 1, 5)
         if #words > 1 then
-            twow = 1
+            twow = "1"
             secondw = sub(words[2], 1, 5)
             secondw_ext = sub(words[2], 6, 20)
             if #secondw_ext == 0 then secondw_ext = ' ' end
         else
-            twow = 0
+            twow = "0"
             secondw = ' '
             secondw_ext = ' '
         end
@@ -404,7 +437,7 @@ end\n
             secondw_ext = sub(words[2], 6, 20)
             if #secondw_ext == 0 then secondw_ext = ' ' end
         else
-            twow = 0
+            twow = "0"
             secondw = ' '
             secondw_ext = ' '
         end
@@ -521,10 +554,37 @@ end\n
             emit(node, ignore=[GlobalVarDef, Subroutine])
     
 def export_cartridge(ast, datfilename):
-    emitter = Emitter(ast, [datfilename], output='cca.lua')
+    emitter = Emitter(ast, [datfilename], output='cca' + ('.p8.lua' if PICO8 else '.lua'))
     header = ''
     if PICO8:
         header = """
+-- https://www.lexaloffle.com/bbs/?pid=101378
+-- add 2 numeric strings
+function stringadd(a, b)
+    return tostr(tonum(a .. "", 2) + tonum(b .. "", 2), 2)
+end
+-- subtract 2 numeric strings
+function stringsub(a, b)
+    return tostr(tonum(a .. "", 2) - tonum(b .. "", 2), 2)
+end
+-- multiply 2 numeric strings
+function stringmul(a, b)
+    return tostr(tonum(a .. "", 2) * (tonum(b .. "", 2) << 16), 2)
+end
+-- divide 2 numeric strings
+function stringdiv(a, b)
+    return tostr(tonum(a .. "", 2) / (tonum(b .. "", 2) << 16), 2)
+end
+-- modulo 2 numeric strings
+-- modulo 2 numeric strings
+function stringmod(a, b)
+    return stringsub(a,stringmul(b,stringdiv(a, b)))
+end
+-- negate numeric string
+function stringneg(a)
+    if sub(a,1,1) == "-" then return sub(a,2)
+    else return "-" .. a end
+end
 
 -- https://www.lexaloffle.com/bbs/?pid=43636
 -- converts anything to string, even nested tables
@@ -573,64 +633,6 @@ for i = 0, 255 do
     local ic, iic = chr(i), chr(i, 0)
     basedictcompress[ic] = iic
     basedictdecompress[iic] = ic
-end
-
-local function dictAddA(str, dict, a, b)
-    if a >= 256 then
-        a, b = 0, b + 1
-        if b >= 256 then
-            dict = {}
-            b = 1
-        end
-    end
-    dict[str] = chr(a, b)
-    a = a + 1
-    return dict, a, b
-end
-
-local function compress(input)
-    if type(input) ~= "string" then
-        return nil, "string expected, got " .. type(input)
-    end
-    local len = #input
-    if len <= 1 then
-        return "u" .. input
-    end
-
-    local dict = {}
-    local a, b = 0, 1
-
-    local result = { "c" }
-    local resultlen = 1
-    local n = 2
-    local word = ""
-    for i = 1, len do
-        local c = sub(input, i, i)
-        local wc = word .. c
-        if not (basedictcompress[wc] or dict[wc]) then
-            local write = basedictcompress[word] or dict[word]
-            if not write then
-                return nil, "algorithm error, could not fetch word"
-            end
-            result[n] = write
-            resultlen = resultlen + #write
-            n = n + 1
-            if len <= resultlen then
-                return "u" .. input
-            end
-            dict, a, b = dictAddA(wc, dict, a, b)
-            word = c
-        else
-            word = wc
-        end
-    end
-    result[n] = basedictcompress[word] or dict[word]
-    resultlen = resultlen + #result[n]
-    n = n + 1
-    if len <= resultlen then
-        return "u" .. input
-    end
-    return cat(result)
 end
 
 local function dictAddB(str, dict, a, b)
@@ -730,7 +732,7 @@ READ_LINES = split(DECOMPRESSED, "|", false)
 function INIT_ARR1(size)
     local a = {}
     for i = 1, size do
-        a[i] = 0
+        a[i] = "0"
     end
     return a
 end
@@ -740,7 +742,7 @@ function INIT_ARR2(size1, size2)
     for i = 1, size1 do
         a[i] = {}
         for j = 1, size2 do
-            a[i][j] = 0
+            a[i][j] = "0"
         end
     end
     return a
@@ -758,12 +760,18 @@ function FORTRAN_READ(types, units)
             if t == "G" then
                 local v = tonum(sub(line, 1, 5))
                 if v == nil or v == '' then
-                    v = 0
+                    v = "0"
+                else
+                    v = tostr(v)
                 end
                 add(result, v)
                 line = sub(line, 6, #line)
             elseif t == "A5" then
-                add(result, sub(line, 1, 5))
+                local v = sub(line, 1, 5)
+                if v == nil or v == '' then
+                    v = ' '
+                end
+                add(result, v)
                 line = sub(line, 6, #line)
             else
                 error("Unsupported format type " .. t)
@@ -818,9 +826,38 @@ end
 """
     else:
         header += """
+
 unpack = table.unpack
 sub = string.sub
 add = table.insert
+tonum = tonumber
+tostr = tostring
+
+-- add 2 numeric strings
+function stringadd(a, b)
+    return tostr(tonum(a .. "") + tonum(b .. ""))
+end
+-- subtract 2 numeric strings
+function stringsub(a, b)
+    return tostr(tonum(a .. "") - tonum(b .. ""))
+end
+-- multiply 2 numeric strings
+function stringmul(a, b)
+    return tostr(tonum(a .. "") * tonum(b .. ""))
+end
+-- divide 2 numeric strings
+function stringdiv(a, b)
+    return tostr(tonum(a .. "") // tonum(b .. ""))
+end
+-- modulo 2 numeric strings
+function stringmod(a, b)
+    return stringsub(a,stringmul(b,stringdiv(a, b)))
+end
+-- negate numeric string
+function stringneg(a)
+    if sub(a,1,1) == "-" then return sub(a,2)
+    else return "-" .. a end
+end
 
 -- http://lua-users.org/wiki/FileInputOutput
 
@@ -848,7 +885,7 @@ READ_LINES = LINES_FROM('formatted-cca.dat')
 function INIT_ARR1(size)
     local a = {}
     for i = 1, size do
-        a[i] = 0
+        a[i] = "0"
     end
     return a
 end
@@ -858,7 +895,7 @@ function INIT_ARR2(size1, size2)
     for i = 1, size1 do
         a[i] = {}
         for j = 1, size2 do
-            a[i][j] = 0
+            a[i][j] = "0"
         end
     end
     return a
@@ -879,14 +916,20 @@ function FORTRAN_READ(types, units)
         local u = units[i]
         for j=1,u,1 do
             if t == "G" then
-                local v = tonumber(sub(line, 1, 5))
+                local v = tonum(sub(line, 1, 5))
                 if v == nil or v == '' then
-                    v = 0
+                    v = "0"
+                else
+                    v = tostr(v)
                 end
                 add(result, v)
                 line = sub(line, 6, #line)
             elseif t == "A5" then
-                add(result, sub(line, 1, 5))
+                local v = sub(line, 1, 5)
+                if v == nil or v == '' then
+                    v = ' '
+                end
+                add(result, v)
                 line = sub(line, 6, #line)
             else
                 error("Unsupported format type " .. t)

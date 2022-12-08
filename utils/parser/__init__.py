@@ -321,7 +321,7 @@ class SyntacticAnalyzer:
     def get_value_expr(self):
         if self.lookahead().chars == '(':
             self.consume('(')
-            expr = self.get_arithmetic_expr()
+            expr = self.get_arithmetic_expr(paren=True)
             self.consume(')')
             return expr
         
@@ -372,7 +372,7 @@ class SyntacticAnalyzer:
         
         return expr
     
-    def get_arithmetic_expr(self, invalid_ops=[]):
+    def get_arithmetic_expr(self, invalid_ops=[], paren=False):
         
         expr = self.get_arithmetic_expr_prec2(invalid_ops=invalid_ops)
         while (
@@ -381,18 +381,18 @@ class SyntacticAnalyzer:
         ):
             op = self.consume(ArithmeticOperator)
             rterm = self.get_arithmetic_expr_prec2(invalid_ops=invalid_ops)
-            expr = ArithmeticExpr(expr, op, rterm)
+            expr = ArithmeticExpr(expr, op, rterm, paren=paren)
         
         return expr
     
-    def get_relational_expr(self):
+    def get_relational_expr(self, paren = False):
         if self.lookahead().chars == '(':
             self.consume('(')
-            expr = self.get_relational_expr()
+            expr = self.get_relational_expr(paren=True)
             self.consume(')')
             return expr
         else:
-            expr = self.get_arithmetic_expr()
+            expr = self.get_arithmetic_expr(paren=False)
         
         while (
             self.lookahead().chars == '.'
@@ -402,17 +402,17 @@ class SyntacticAnalyzer:
             op = self.consume(RelationalOperator)
             self.consume('.')
             rterm = self.get_arithmetic_expr()
-            expr = RelationalExpr(expr, op, rterm)
+            expr = RelationalExpr(expr, op, rterm, paren=paren)
         
         return expr
     
-    def get_logical_expr(self):
+    def get_logical_expr(self, paren=False):
         if self.lookahead().chars == '(':
             self.consume('(')
-            expr = self.get_logical_expr()
+            expr = self.get_logical_expr(paren=True)
             self.consume(')')
         else:
-            expr = self.get_relational_expr()
+            expr = self.get_relational_expr(paren=False)
 
         while (
             self.lookahead().chars == '.'
@@ -424,18 +424,18 @@ class SyntacticAnalyzer:
                     op = self.consume(LogicalOperator)
                     self.consume('.')
                     rterm = self.get_logical_expr()
-                    expr = LogicalExpr(expr, op, rterm)
+                    expr = LogicalExpr(expr, op, rterm, paren=paren)
                 elif isinstance(self.lookahead(), RelationalOperator):
                     op = self.consume(RelationalOperator)
                     self.consume('.')
                     rterm = self.get_logical_expr()
-                    expr = RelationalExpr(expr, op, rterm)
+                    expr = RelationalExpr(expr, op, rterm, paren=paren)
                 else:
                     self.error(self.lookahead(), 'Expected logical or relational operator')
             elif isinstance(self.lookahead(), ArithmeticOperator):
                 op = self.consume(ArithmeticOperator)
                 rterm = self.get_logical_expr()
-                expr = ArithmeticExpr(expr, op, rterm)
+                expr = ArithmeticExpr(expr, op, rterm, paren=paren)
             else:
                 self.error(self.lookahead(), 'Expected arithmetic operator')
         

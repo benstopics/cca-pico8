@@ -1,27 +1,22 @@
 
-
-unpack = table.unpack
-sub = string.sub
-add = table.insert
-tonum = tonumber
-tostr = tostring
-
+-- https://www.lexaloffle.com/bbs/?pid=101378
 -- add 2 numeric strings
 function stringadd(a, b)
-    return tostr(tonum(a .. "") + tonum(b .. ""))
+    return tostr(tonum(a .. "", 2) + tonum(b .. "", 2), 2)
 end
 -- subtract 2 numeric strings
 function stringsub(a, b)
-    return tostr(tonum(a .. "") - tonum(b .. ""))
+    return tostr(tonum(a .. "", 2) - tonum(b .. "", 2), 2)
 end
 -- multiply 2 numeric strings
 function stringmul(a, b)
-    return tostr(tonum(a .. "") * tonum(b .. ""))
+    return tostr(tonum(a .. "", 2) * (tonum(b .. "", 2) << 16), 2)
 end
 -- divide 2 numeric strings
 function stringdiv(a, b)
-    return tostr(tonum(a .. "") // tonum(b .. ""))
+    return tostr(tonum(a .. "", 2) / (tonum(b .. "", 2) << 16), 2)
 end
+-- modulo 2 numeric strings
 -- modulo 2 numeric strings
 function stringmod(a, b)
     return stringsub(a,stringmul(b,stringdiv(a, b)))
@@ -32,28 +27,148 @@ function stringneg(a)
     else return "-" .. a end
 end
 
--- http://lua-users.org/wiki/FileInputOutput
-
--- see if the file exists
-function FILE_EXISTS(file)
-    local f = io.open(file, "rb")
-    if f then f:close() end
-    return f ~= nil
-end
-
--- get all lines from a file, returns an empty
--- list/table if the file does not exist
-function LINES_FROM(file)
-    if not FILE_EXISTS(file) then return {} end
-    local lines = {}
-    for line in io.lines(file) do
-        lines[#lines + 1] = line
+-- https://www.lexaloffle.com/bbs/?pid=43636
+-- converts anything to string, even nested tables
+function tostring(any)
+    if type(any)=="function" then 
+        return "function" 
     end
-    return lines
+    if any==nil then 
+        return "nil" 
+    end
+    if type(any)=="string" then
+        return any
+    end
+    if type(any)=="boolean" then
+        if any then return "true" end
+        return "false"
+    end
+    if type(any)=="table" then
+        local str = "{ "
+        for k,v in pairs(any) do
+            str=str..tostring(k).."->"..tostring(v).." "
+        end
+        return str.."}"
+    end
+    if type(any)=="number" then
+        return ""..any
+    end
+    return "unkown" -- should never show
+end
+cls()
+
+poke(0x5f2d, 1) -- Enable keyboard/mouse
+
+-- https://www.lexaloffle.com/bbs/?tid=41798
+function cat(t)
+    local s = ''
+    for i = 1, #t, 1 do
+        s = s .. t[i]
+    end
+    return s
 end
 
--- tests the functions above
-READ_LINES = LINES_FROM('formatted-cca.dat')
+local basedictcompress = {}
+local basedictdecompress = {}
+for i = 0, 255 do
+    local ic, iic = chr(i), chr(i, 0)
+    basedictcompress[ic] = iic
+    basedictdecompress[iic] = ic
+end
+
+local function dictAddB(str, dict, a, b)
+    if a >= 256 then
+        a, b = 0, b + 1
+        if b >= 256 then
+            dict = {}
+            b = 1
+        end
+    end
+    dict[chr(a, b)] = str
+    a = a + 1
+    return dict, a, b
+end
+
+local function decompress(input)
+    if type(input) ~= "string" then
+        error("string expected, got " .. type(input))
+    end
+
+    if #input < 1 then
+        error("invalid input - not a compressed string")
+    end
+
+    local control = sub(input, 1, 1)
+    if control == "u" then
+        return sub(input, 2)
+    elseif control ~= "c" then
+        error("invalid input - not a compressed string")
+    end
+    input = sub(input, 2)
+    local len = #input
+
+    if len < 2 then
+        error("invalid input - not a compressed string")
+    end
+
+    local dict = {}
+    local a, b = 0, 1
+
+    local result = {}
+    local n = 1
+    local last = sub(input, 1, 2)
+    result[n] = basedictdecompress[last] or dict[last]
+    n = n + 1
+    for i = 3, len, 2 do
+        local code = sub(input, i, i + 1)
+        local lastStr = basedictdecompress[last] or dict[last]
+        if not lastStr then
+            error("could not find last from dict. Invalid input?")
+        end
+        local toAdd = basedictdecompress[code] or dict[code]
+        if toAdd then
+            result[n] = toAdd
+            n = n + 1
+            dict, a, b = dictAddB(lastStr .. sub(toAdd, 1, 1), dict, a, b)
+        else
+            local tmp = lastStr .. sub(lastStr, 1, 1)
+            result[n] = tmp
+            n = n + 1
+            dict, a, b = dictAddB(tmp, dict, a, b)
+        end
+        last = code
+    end
+    return cat(result)
+end
+
+-- https://stackoverflow.com/a/18694774
+function utf8_from(t)
+    local bytearr = {}
+    for i = 1, #t, 1 do
+        add(bytearr, chr(t[i]))
+        --if i < 40 then print(chr(t[i]),1 + 4 * (i - 1),1) end
+    end
+    return cat(bytearr)
+end
+
+-- __gfx__ + __map__ --
+READ_UTF8_DATA = {}
+for i = 0, 0x2fff, 1 do
+    add(READ_UTF8_DATA, peek(i))
+end
+
+-- __sfx__ --
+for i = 0x3200, 0x3200 + 843 - 1, 1 do
+    add(READ_UTF8_DATA, peek(i))
+end
+--print(tostr(#READ_UTF8_DATA),1,9)
+COMPRESSED = utf8_from(READ_UTF8_DATA)
+DECOMPRESSED = decompress(COMPRESSED)
+--print(sub(DECOMPRESSED,#DECOMPRESSED - 20,#DECOMPRESSED),1,18)
+
+READ_LINES = split(DECOMPRESSED, "|", false)
+
+--cstore(0x3200, 0x0000, 4096)
 
 function INIT_ARR1(size)
     local a = {}
@@ -74,20 +189,15 @@ function INIT_ARR2(size1, size2)
     return a
 end
 
-function PAUSE(msg)
-    print(msg)
-    return io.read()
-end
-
 READ_LINE_IDX = 1
 
 function FORTRAN_READ(types, units)
     local line = READ_LINES[READ_LINE_IDX]
     local result = {}
-    for i=1,#types,1 do
+    for i = 1, #types, 1 do
         local t = types[i]
         local u = units[i]
-        for j=1,u,1 do
+        for j = 1, u, 1 do
             if t == "G" then
                 local v = tonum(sub(line, 1, 5))
                 if v == nil or v == '' then
@@ -113,8 +223,46 @@ function FORTRAN_READ(types, units)
     return result
 end
 
+SCREEN_TEXT = { '' }
+MAX_SCREEN_WIDTH = 32
+MAX_SCREEN_LINES = 20
 function FORTRAN_WRITE(text)
-    io.write(text)
+    -- Add new text to buffer with wordwrap
+    for c = 1, #text, 1 do
+        if sub(text, c, c) == "\n" then
+            add(SCREEN_TEXT, '')
+        else
+            if #SCREEN_TEXT[#SCREEN_TEXT] == MAX_SCREEN_WIDTH then
+                add(SCREEN_TEXT, '')
+            end
+            SCREEN_TEXT[#SCREEN_TEXT] = SCREEN_TEXT[#SCREEN_TEXT] .. sub(text, c, c)
+        end
+
+        while #SCREEN_TEXT > MAX_SCREEN_LINES do
+            st = {}
+            for r = 2, #SCREEN_TEXT, 1 do
+                add(st, SCREEN_TEXT[r])
+            end
+            SCREEN_TEXT = st
+        end
+    end
+end
+function DRAW_SCREEN()
+    -- Clear screen
+    cls()
+
+    -- Draw game text
+    for r = 1, #SCREEN_TEXT, 1 do
+        for c = 1, #SCREEN_TEXT[r], 1 do
+            print(SCREEN_TEXT[r], 0, (r - 1) * 6, 11)
+        end
+    end
+end
+
+function PAUSE(msg)
+    FORTRAN_WRITE(msg .. "\n")
+    DRAW_SCREEN()
+    GETIN(_, _, _, _)
 end
 RTEXT = nil
 LLINE = nil
@@ -136,14 +284,74 @@ FORTRAN_WRITE("\n")
 if true then return {IT} end
 end
 function GETIN(TWOW,B,C,D)
-    local input = sub(io.read(), 1, 20)
-    local words = {}
-    for word in input:gmatch("%w+") do add(words, word) end
+
+-- Render screen
+    DRAW_SCREEN()
+
+    kb_chars_alnum = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
+    BACKSPACE_SCANCODE = 42
+    SPACE_SCANCODE = 44
+    ENTER_SCANCODE = 88
+
+    t = ''
+    key_states = {}
+    enter_pressed = false
+    while true do
+        pressed_key = 0
+
+        -- Update enter keypress
+        local enter_was_pressed = enter_pressed
+        local enter_pressed = stat(31) == "\r"
+        if enter_pressed and not enter_was_pressed then
+            pressed_key = 88
+        else
+            -- Update alphanum pressed statuses
+            for scancode = 4, 256, 1 do
+                local was_pressed = key_states[scancode]
+                local pressed = stat(28, scancode)
+                key_states[scancode] = pressed
+
+                -- if pressed then print(scancode, 1, 1, 11) end
+
+                -- Initial press only
+                if pressed and not was_pressed then
+                    pressed_key = scancode
+                    break
+                end
+            end
+        end
+
+        -- Manage input line
+        if pressed_key >= 4 and pressed_key <= 39 and #t < 20 then
+            t = t .. sub(kb_chars_alnum, pressed_key - 3, pressed_key - 3)
+        elseif pressed_key == SPACE_SCANCODE and sub(t, #t, #t) ~= " " then
+            t = t .. " "
+        elseif pressed_key == BACKSPACE_SCANCODE and #t > 0 then
+            t = sub(t, 1, #t - 1)
+        elseif pressed_key == ENTER_SCANCODE then
+            break
+        end
+
+        -- Draw user input
+        rectfill(0, 6 * (#SCREEN_TEXT), 127,6 * (#SCREEN_TEXT + 1), 0)
+        local show_cursor = time() % 1 < 0.5
+        local cursor = ""
+        if show_cursor then cursor = "_" else show_cursor = " " end
+        print(">" .. t .. cursor .. "                                      ", 0, 6 * (#SCREEN_TEXT), 11)
+        flip()
+
+        -- https://www.lexaloffle.com/bbs/?tid=41855
+        poke(0x5f30, 1) -- prevents the p character or the enter key from calling the menu.
+    end
+    local input = sub(t, 1, 20)
+    FORTRAN_WRITE(sub("\n>" .. input .. "                                      ",1,21) .. "\n\n")
+    --print(input)
+    local words = split(input, " ", false)
     local twow, firstw, secondw_ext, secondw
     if #words > 0 then
         firstw = sub(words[1], 1, 5)
         if #words > 1 then
-            twow = "1"
+            twow = 1
             secondw = sub(words[2], 1, 5)
             secondw_ext = sub(words[2], 6, 20)
             if #secondw_ext == 0 then secondw_ext = ' ' end
@@ -153,7 +361,8 @@ function GETIN(TWOW,B,C,D)
             secondw_ext = ' '
         end
     end
-    return {twow, firstw, secondw, secondw_ext}
+    return { twow, firstw, secondw, secondw_ext }
+
 end
 
 function YES(X,Y,Z,YEA)
@@ -238,10 +447,10 @@ I=stringsub("1","1")
 I = stringadd(I,"1")
 if tonum(I) > tonum("300") then goto f00006 end
 STEXT[tonum(I)]="0"
-if (tonum(I)<=tonum("200")) then
+if (tonum(I, 2)<=tonum("200", 2)) then
 BTEXT[tonum(I)]="0"
 end
-if (tonum(I)<=tonum("100")) then
+if (tonum(I, 2)<=tonum("100", 2)) then
 RTEXT[tonum(I)]="0"
 end
 ::l01001::
@@ -295,7 +504,7 @@ end
 goto c00012
 goto c00012
 ::f00013::
-os.exit()
+stop()
 ::l01007::
 LLINE[tonum(I)][tonum("2")]=stringadd(stringsub("20",KK),"1")
 LLINE[tonum(I)][tonum("1")]="0"
@@ -328,7 +537,7 @@ goto l01004
 end
 PAUSE("TOO MANY LINES")
 ::l01011::
-if (tonum(JKIND)<tonum("200")) then
+if (tonum(JKIND, 2)<tonum("200", 2)) then
 goto l01012
 end
 if (BTEXT[tonum(stringsub(JKIND,"100"))]~="0") then
@@ -384,7 +593,7 @@ end
 TRAVEL[tonum(I)]=stringadd(stringmul(LKIND,"1024"),TK[tonum(L)])
 I=stringadd(I,"1")
 if (I=="1000") then
-os.exit()
+stop()
 end
 ::l01018::
 goto c00016
@@ -519,7 +728,7 @@ goto l00071
 if (IDWARF~="1") then
 goto l00063
 end
-if (tonum(math.random())>tonum("0.05")) then
+if (tonum(rnd(), 2)>tonum("0.05", 2)) then
 goto l00071
 end
 IDWARF="2"
@@ -547,14 +756,14 @@ I=stringsub("1","1")
 ::c00034::
 I = stringadd(I,"1")
 if tonum(I) > tonum("3") then goto f00035 end
-if (tonum(stringadd(stringmul("2",I),IDWARF))<tonum("8")) then
+if (tonum(stringadd(stringmul("2",I),IDWARF), 2)<tonum("8", 2)) then
 goto l00066
 end
-if (tonum(stringadd(stringmul("2",I),IDWARF))>tonum("23") and DSEEN[tonum(I)]=="0") then
+if (tonum(stringadd(stringmul("2",I),IDWARF), 2)>tonum("23", 2) and DSEEN[tonum(I)]=="0") then
 goto l00066
 end
 ODLOC[tonum(I)]=DLOC[tonum(I)]
-if (DSEEN[tonum(I)]~="0" and tonum(LOC)>tonum("14")) then
+if (DSEEN[tonum(I)]~="0" and tonum(LOC, 2)>tonum("14", 2)) then
 goto l00065
 end
 DLOC[tonum(I)]=DTRAV[tonum(stringsub(stringadd(stringmul(I,"2"),IDWARF),"8"))]
@@ -570,7 +779,7 @@ if (ODLOC[tonum(I)]~=DLOC[tonum(I)]) then
 goto l00066
 end
 ATTACK=stringadd(ATTACK,"1")
-if (tonum(math.random())<tonum("0.1")) then
+if (tonum(rnd(), 2)<tonum("0.1", 2)) then
 STICK=stringadd(STICK,"1")
 end
 ::l00066::
@@ -651,7 +860,7 @@ FORTRAN_WRITE("\n")
 if (COND[tonum(L)]=="2") then
 goto l00008
 end
-if (LOC=="33" and tonum(math.random())<tonum("0.25")) then
+if (LOC=="33" and tonum(rnd(), 2)<tonum("0.25", 2)) then
 _ = unpack(SPEAK("8"))
 end
 J=L
@@ -673,7 +882,7 @@ end
 LOLD=L
 ::l00009::
 LL=TRAVEL[tonum(KK)]
-if (tonum(LL)<tonum("0")) then
+if (tonum(LL, 2)<tonum("0", 2)) then
 LL=stringneg(LL)
 end
 if ("1"==stringmod(LL,"1024")) then
@@ -682,7 +891,7 @@ end
 if (K==stringmod(LL,"1024")) then
 goto l00010
 end
-if (tonum(TRAVEL[tonum(KK)])<tonum("0")) then
+if (tonum(TRAVEL[tonum(KK)], 2)<tonum("0", 2)) then
 goto l00011
 end
 KK=stringadd(KK,"1")
@@ -697,7 +906,7 @@ L=stringdiv(LL,"1024")
 goto l00021
 ::l00011::
 JSPK="12"
-if (tonum(K)>=tonum("43") and tonum(K)<=tonum("46")) then
+if (tonum(K, 2)>=tonum("43", 2) and tonum(K, 2)<=tonum("46", 2)) then
 JSPK="9"
 end
 if (K=="29" or K=="30") then
@@ -727,7 +936,7 @@ if (IFIRST=="0") then
 _ = unpack(SPEAK("14"))
 end
 ::l00021::
-if (tonum(L)<tonum("300")) then
+if (tonum(L, 2)<tonum("300", 2)) then
 goto l00002
 end
 IL=stringadd(stringsub(L,"300"),"1")
@@ -764,7 +973,7 @@ end
 goto l00002
 ::l00022::
 L="6"
-if (tonum(math.random())>tonum("0.5")) then
+if (tonum(rnd(), 2)>tonum("0.5", 2)) then
 L="5"
 end
 goto l00002
@@ -820,7 +1029,7 @@ goto l00002
 PAUSE("GAME IS OVER")
 goto l01100
 ::l00032::
-if (tonum(IDETAL)<tonum("3")) then
+if (tonum(IDETAL, 2)<tonum("3", 2)) then
 _ = unpack(SPEAK("15"))
 end
 IDETAL=stringadd(IDETAL,"1")
@@ -834,7 +1043,7 @@ L="9"
 end
 goto l00002
 ::l00034::
-if (tonum(math.random())>tonum("0.2")) then
+if (tonum(rnd(), 2)>tonum("0.2", 2)) then
 goto l00035
 end
 L="68"
@@ -845,36 +1054,36 @@ L="65"
 _ = unpack(SPEAK("56"))
 goto l00002
 ::l00036::
-if (tonum(math.random())>tonum("0.2")) then
+if (tonum(rnd(), 2)>tonum("0.2", 2)) then
 goto l00035
 end
 L="39"
-if (tonum(math.random())>tonum("0.5")) then
+if (tonum(rnd(), 2)>tonum("0.5", 2)) then
 L="70"
 end
 goto l00002
 ::l00037::
 L="66"
-if (tonum(math.random())>tonum("0.4")) then
+if (tonum(rnd(), 2)>tonum("0.4", 2)) then
 goto l00038
 end
 L="71"
-if (tonum(math.random())>tonum("0.25")) then
+if (tonum(rnd(), 2)>tonum("0.25", 2)) then
 L="72"
 end
 goto l00002
 ::l00039::
 L="66"
-if (tonum(math.random())>tonum("0.2")) then
+if (tonum(rnd(), 2)>tonum("0.2", 2)) then
 goto l00038
 end
 L="77"
 goto l00002
 ::l00040::
-if (tonum(LOC)<tonum("8")) then
+if (tonum(LOC, 2)<tonum("8", 2)) then
 _ = unpack(SPEAK("57"))
 end
-if (tonum(LOC)>=tonum("8")) then
+if (tonum(LOC, 2)>=tonum("8", 2)) then
 _ = unpack(SPEAK("58"))
 end
 L=LOC
@@ -1041,10 +1250,10 @@ TWOWDS="0"
 goto l02023
 ::l03000::
 JSPK="60"
-if (tonum(math.random())>tonum("0.8")) then
+if (tonum(rnd(), 2)>tonum("0.8", 2)) then
 JSPK="61"
 end
-if (tonum(math.random())>tonum("0.8")) then
+if (tonum(rnd(), 2)>tonum("0.8", 2)) then
 JSPK="13"
 end
 JSPK = unpack(SPEAK(JSPK))
@@ -1154,7 +1363,7 @@ goto l02020
 if (IDARK=="0") then
 goto l00008
 end
-if (tonum(math.random())>tonum("0.25")) then
+if (tonum(rnd(), 2)>tonum("0.25", 2)) then
 goto l00008
 end
 ::l05017::
@@ -1175,7 +1384,7 @@ end
 if (J=="1" or J=="4" or J=="7") then
 goto l05098
 end
-if (tonum(J)>tonum("9") and tonum(J)<tonum("15")) then
+if (tonum(J, 2)>tonum("9", 2) and tonum(J, 2)<tonum("15", 2)) then
 goto l05097
 end
 ::l00502::
@@ -1392,7 +1601,7 @@ _ = unpack(SPEAK("45"))
 IPLACE[tonum(JOBJ)]="300"
 goto l09005
 ::l05307::
-if (tonum(math.random())>tonum("0.4")) then
+if (tonum(rnd(), 2)>tonum("0.4", 2)) then
 goto l05309
 end
 DSEEN[tonum(IID)]="0"
@@ -1431,4 +1640,4 @@ JSPK="78"
 end
 PROP[tonum(WATER)]="1"
 goto l05200
-os.exit()
+stop()
