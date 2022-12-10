@@ -344,7 +344,16 @@ class Emitter:
 
         if fn.name == 'GETIN':
             if not PICO8:
-                self.output("""    local input = sub(io.read(), 1, 20)
+                self.output("""
+    
+    if #unit_test > 0 then
+        input = unit_test[1]
+        deli(unit_test, 1)
+        FORTRAN_WRITE(input .. "\\n")
+    else
+        input = sub(io.read(), 1, 20)
+    end
+    input = upper(input)
     local words = {}
     for word in input:gmatch("%w+") do add(words, word) end
     local twow, firstw, secondw_ext, secondw
@@ -366,65 +375,73 @@ end\n
 """)
             else:
                 self.output("""
+    
 -- Render screen
     DRAW_SCREEN()
 
-    kb_chars_alnum = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
-    BACKSPACE_SCANCODE = 42
-    SPACE_SCANCODE = 44
-    ENTER_SCANCODE = 88
+    local input = ''
+    if #unit_test > 0 then
+        input = unit_test[1]
+        deli(unit_test, 1)
+        FORTRAN_WRITE(input .. "\\n")
+    else
+        kb_chars_alnum = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
+        BACKSPACE_SCANCODE = 42
+        SPACE_SCANCODE = 44
+        ENTER_SCANCODE = 88
 
-    t = ''
-    key_states = {}
-    enter_pressed = false
-    while true do
-        pressed_key = 0
+        t = ''
+        key_states = {}
+        enter_pressed = false
+        while true do
+            pressed_key = 0
 
-        -- Update enter keypress
-        local enter_was_pressed = enter_pressed
-        local enter_pressed = stat(31) == "\\r"
-        if enter_pressed and not enter_was_pressed then
-            pressed_key = 88
-        else
-            -- Update alphanum pressed statuses
-            for scancode = 4, 256, 1 do
-                local was_pressed = key_states[scancode]
-                local pressed = stat(28, scancode)
-                key_states[scancode] = pressed
+            -- Update enter keypress
+            local enter_was_pressed = enter_pressed
+            local enter_pressed = stat(31) == "\\r"
+            if enter_pressed and not enter_was_pressed then
+                pressed_key = 88
+            else
+                -- Update alphanum pressed statuses
+                for scancode = 4, 256, 1 do
+                    local was_pressed = key_states[scancode]
+                    local pressed = stat(28, scancode)
+                    key_states[scancode] = pressed
 
-                -- if pressed then print(scancode, 1, 1, 11) end
+                    -- if pressed then print(scancode, 1, 1, 11) end
 
-                -- Initial press only
-                if pressed and not was_pressed then
-                    pressed_key = scancode
-                    break
+                    -- Initial press only
+                    if pressed and not was_pressed then
+                        pressed_key = scancode
+                        break
+                    end
                 end
             end
+
+            -- Manage input line
+            if pressed_key >= 4 and pressed_key <= 39 and #t < 20 then
+                t = t .. sub(kb_chars_alnum, pressed_key - 3, pressed_key - 3)
+            elseif pressed_key == SPACE_SCANCODE and sub(t, #t, #t) ~= " " then
+                t = t .. " "
+            elseif pressed_key == BACKSPACE_SCANCODE and #t > 0 then
+                t = sub(t, 1, #t - 1)
+            elseif pressed_key == ENTER_SCANCODE then
+                break
+            end
+
+            -- Draw user input
+            rectfill(0, 6 * (#SCREEN_TEXT), 127,6 * (#SCREEN_TEXT + 1), 0)
+            local show_cursor = time() % 1 < 0.5
+            local cursor = ""
+            if show_cursor then cursor = "_" else show_cursor = " " end
+            print(">" .. t .. cursor .. "                                      ", 0, 6 * (#SCREEN_TEXT), 11)
+            flip()
+
+            -- https://www.lexaloffle.com/bbs/?tid=41855
+            poke(0x5f30, 1) -- prevents the p character or the enter key from calling the menu.
         end
-
-        -- Manage input line
-        if pressed_key >= 4 and pressed_key <= 39 and #t < 20 then
-            t = t .. sub(kb_chars_alnum, pressed_key - 3, pressed_key - 3)
-        elseif pressed_key == SPACE_SCANCODE and sub(t, #t, #t) ~= " " then
-            t = t .. " "
-        elseif pressed_key == BACKSPACE_SCANCODE and #t > 0 then
-            t = sub(t, 1, #t - 1)
-        elseif pressed_key == ENTER_SCANCODE then
-            break
-        end
-
-        -- Draw user input
-        rectfill(0, 6 * (#SCREEN_TEXT), 127,6 * (#SCREEN_TEXT + 1), 0)
-        local show_cursor = time() % 1 < 0.5
-        local cursor = ""
-        if show_cursor then cursor = "_" else show_cursor = " " end
-        print(">" .. t .. cursor .. "                                      ", 0, 6 * (#SCREEN_TEXT), 11)
-        flip()
-
-        -- https://www.lexaloffle.com/bbs/?tid=41855
-        poke(0x5f30, 1) -- prevents the p character or the enter key from calling the menu.
+        input = sub(t, 1, 20)
     end
-    local input = sub(t, 1, 20)
     FORTRAN_WRITE(sub("\\n>" .. input .. "                                      ",1,21) .. "\\n\\n")
     --print(input)
     local words = split(input, " ", false)
@@ -556,6 +573,62 @@ end\n
 def export_cartridge(ast, datfilename):
     emitter = Emitter(ast, [datfilename], output='cca' + ('.p8.lua' if PICO8 else '.lua'))
     header = ''
+    unit_tests = """
+run_tests = true
+unit_test = {}
+if run_tests then
+    srand(12345)
+
+    unit_test = {
+        -- STARTING THE GAME
+        'CONTINUE',
+        'N',
+        -- GETTING INTO THE CAVE
+        'BUILDING',
+        'TAKE KEYS',
+        'TAKE LAMP',
+        'EXIT',
+        'S', 'SOUTH', 'DOWN',
+        'OPEN GRATE',
+        'DOWN',
+        'WEST',
+        'TAKE CAGE',
+        'W',
+        'LAMP ON',
+        'TAKE ROD',
+        'XYZZY',
+        'XYZZY',
+        'W',
+        'DROP ROD',
+        'W',
+        'TAKE BIRD',
+        'EAST',
+        'TAKE ROD',
+        'WEST',
+        'WEST',
+        'D',
+        'D',
+        -- LEVEL 1 - SNAKES AND PLUGHS
+        'DROP BIRD',
+        'DROP ROD',
+        'TAKE BIRD',
+        'TAKE ROD',
+        'W', 'TAKE COINS',
+        'BACK',
+        'S', 'TAKE JEWELS',
+        'BACK',
+        'N', 'TAKE SILVER',
+        'N', 'PLUGH',
+        'DROP COINS',
+        'DROP JEWELS',
+        'DROP SILVER',
+        'DROP KEYS',
+        'PLUGH',
+        'S', 'D', 'W', 'D',
+        'W', 'SLAB', 'S', 'E',
+    }
+end
+"""
     if PICO8:
         header = """
 -- https://www.lexaloffle.com/bbs/?pid=101378
@@ -824,14 +897,18 @@ function PAUSE(msg)
     GETIN(_, _, _, _)
 end
 """
+        header += unit_tests
     else:
         header += """
 
+srand = math.randomseed
 unpack = table.unpack
 sub = string.sub
 add = table.insert
 tonum = tonumber
 tostr = tostring
+deli = table.remove
+upper = string.upper
 
 -- add 2 numeric strings
 function stringadd(a, b)
@@ -858,7 +935,9 @@ function stringneg(a)
     if sub(a,1,1) == "-" then return sub(a,2)
     else return "-" .. a end
 end
-
+"""
+        header += unit_tests
+        header += """
 -- http://lua-users.org/wiki/FileInputOutput
 
 -- see if the file exists
@@ -903,7 +982,7 @@ end
 
 function PAUSE(msg)
     print(msg)
-    return io.read()
+    GETIN(_,_,_,_)
 end
 
 READ_LINE_IDX = 1

@@ -1,10 +1,13 @@
 
 
+srand = math.randomseed
 unpack = table.unpack
 sub = string.sub
 add = table.insert
 tonum = tonumber
 tostr = tostring
+deli = table.remove
+upper = string.upper
 
 -- add 2 numeric strings
 function stringadd(a, b)
@@ -30,6 +33,77 @@ end
 function stringneg(a)
     if sub(a,1,1) == "-" then return sub(a,2)
     else return "-" .. a end
+end
+
+run_tests = true
+unit_test = {}
+if run_tests then
+    srand(12345)
+
+    unit_test = {
+        -- STARTING THE GAME
+        'CONTINUE',
+        'N',
+        -- GETTING INTO THE CAVE
+        'BUILDING',
+        'TAKE KEYS',
+        'TAKE LAMP',
+        'EXIT',
+        'S', 'SOUTH', 'DOWN',
+        'OPEN GRATE',
+        'DOWN',
+        'WEST',
+        'TAKE CAGE',
+        'W',
+        'LAMP ON',
+        'TAKE ROD',
+        'XYZZY',
+        'XYZZY',
+        'W',
+        'DROP ROD',
+        'W',
+        'TAKE BIRD',
+        'EAST',
+        'TAKE ROD',
+        'WEST',
+        'WEST',
+        'D',
+        'D',
+        -- LEVEL 1 - SNAKES AND PLUGHS
+        'DROP BIRD',
+        'DROP ROD',
+        'TAKE BIRD',
+        'TAKE ROD',
+        'W', 'TAKE COINS',
+        'BACK',
+        'S', 'TAKE JEWELS',
+        'BACK',
+        'N', 'TAKE SILVER',
+        'N', 'PLUGH',
+        'DROP COINS',
+        'DROP JEWELS',
+        'DROP SILVER',
+        'DROP KEYS',
+        'PLUGH',
+        'S', 'D', 'W', 'D',
+        'W', 'SLAB', 'S', 'E',
+    }
+
+    -- unit_test = {
+    --     "hi",
+    --     "no",
+    --     "e",
+    --     "get lamp",
+    --     "light lamp",
+    --     "plugh",
+    --     "s",
+    --     "d",
+    --     "w",
+    --     "d",
+    --     "w",
+    --     "w",
+    --     "s",
+    -- }
 end
 
 -- http://lua-users.org/wiki/FileInputOutput
@@ -76,7 +150,7 @@ end
 
 function PAUSE(msg)
     print(msg)
-    return io.read()
+    GETIN(_,_,_,_)
 end
 
 READ_LINE_IDX = 1
@@ -136,7 +210,16 @@ FORTRAN_WRITE("\n")
 if true then return {IT} end
 end
 function GETIN(TWOW,B,C,D)
-    local input = sub(io.read(), 1, 20)
+
+    
+    if #unit_test > 0 then
+        input = unit_test[1]
+        deli(unit_test, 1)
+        FORTRAN_WRITE(input .. "\n")
+    else
+        input = sub(io.read(), 1, 20)
+    end
+    input = upper(input)
     local words = {}
     for word in input:gmatch("%w+") do add(words, word) end
     local twow, firstw, secondw_ext, secondw
@@ -178,31 +261,31 @@ end
 if true then return {X,Y,Z,YEA} end
 end
 SETUP="0"
-IOBJ = INIT_ARR1(300)
-ICHAIN = INIT_ARR1(100)
-IPLACE = INIT_ARR1(100)
-IFIXED = INIT_ARR1(100)
-COND = INIT_ARR1(300)
-PROP = INIT_ARR1(100)
-ABB = INIT_ARR1(300)
+IOBJ = INIT_ARR1(1000)
+ICHAIN = INIT_ARR1(1000)
+IPLACE = INIT_ARR1(1000)
+IFIXED = INIT_ARR1(1000)
+COND = INIT_ARR1(1000)
+PROP = INIT_ARR1(1000)
+ABB = INIT_ARR1(1000)
 LLINE = INIT_ARR2(1000,22)
-LTEXT = INIT_ARR1(300)
-STEXT = INIT_ARR1(300)
-KEY = INIT_ARR1(300)
-DEFAULT = INIT_ARR1(300)
+LTEXT = INIT_ARR1(1000)
+STEXT = INIT_ARR1(1000)
+KEY = INIT_ARR1(1000)
+DEFAULT = INIT_ARR1(1000)
 TRAVEL = INIT_ARR1(1000)
-TK = INIT_ARR1(25)
+TK = INIT_ARR1(1000)
 KTAB = INIT_ARR1(1000)
 ATAB = INIT_ARR1(1000)
-BTEXT = INIT_ARR1(200)
-DSEEN = INIT_ARR1(10)
-DLOC = INIT_ARR1(10)
-ODLOC = INIT_ARR1(10)
-DTRAV = INIT_ARR1(20)
-RTEXT = INIT_ARR1(100)
-JSPKT = INIT_ARR1(100)
-IPLT = INIT_ARR1(100)
-IFIXT = INIT_ARR1(100)
+BTEXT = INIT_ARR1(1000)
+DSEEN = INIT_ARR1(1000)
+DLOC = INIT_ARR1(1000)
+ODLOC = INIT_ARR1(1000)
+DTRAV = INIT_ARR1(1000)
+RTEXT = INIT_ARR1(1000)
+JSPKT = INIT_ARR1(1000)
+IPLT = INIT_ARR1(1000)
+IFIXT = INIT_ARR1(1000)
 if (SETUP~="0") then
 goto l00001
 end

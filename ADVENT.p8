@@ -267,6 +267,61 @@ function PAUSE(msg)
     DRAW_SCREEN()
     GETIN(_, _, _, _)
 end
+
+run_tests = false
+unit_test = {}
+if run_tests then
+    srand(12345)
+
+    unit_test = {
+        -- STARTING THE GAME
+        'CONTINUE',
+        'N',
+        -- GETTING INTO THE CAVE
+        'BUILDING',
+        'TAKE KEYS',
+        'TAKE LAMP',
+        'EXIT',
+        'S', 'SOUTH', 'DOWN',
+        'OPEN GRATE',
+        'DOWN',
+        'WEST',
+        'TAKE CAGE',
+        'W',
+        'LAMP ON',
+        'TAKE ROD',
+        'XYZZY',
+        'XYZZY',
+        'W',
+        'DROP ROD',
+        'W',
+        'TAKE BIRD',
+        'EAST',
+        'TAKE ROD',
+        'WEST',
+        'WEST',
+        'D',
+        'D',
+        -- LEVEL 1 - SNAKES AND PLUGHS
+        'DROP BIRD',
+        'DROP ROD',
+        'TAKE BIRD',
+        'TAKE ROD',
+        'W', 'TAKE COINS',
+        'BACK',
+        'S', 'TAKE JEWELS',
+        'BACK',
+        'N', 'TAKE SILVER',
+        'N', 'PLUGH',
+        'DROP COINS',
+        'DROP JEWELS',
+        'DROP SILVER',
+        'DROP KEYS',
+        'PLUGH',
+        'S', 'D', 'W', 'D',
+        'W', 'SLAB', 'S', 'E',
+    }
+end
 RTEXT = nil
 LLINE = nil
 function SPEAK(IT)
@@ -288,65 +343,73 @@ if true then return {IT} end
 end
 function GETIN(TWOW,B,C,D)
 
+    
 -- Render screen
     DRAW_SCREEN()
 
-    kb_chars_alnum = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
-    BACKSPACE_SCANCODE = 42
-    SPACE_SCANCODE = 44
-    ENTER_SCANCODE = 88
+    local input = ''
+    if #unit_test > 0 then
+        input = unit_test[1]
+        deli(unit_test, 1)
+        FORTRAN_WRITE(input .. "\n")
+    else
+        kb_chars_alnum = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
+        BACKSPACE_SCANCODE = 42
+        SPACE_SCANCODE = 44
+        ENTER_SCANCODE = 88
 
-    t = ''
-    key_states = {}
-    enter_pressed = false
-    while true do
-        pressed_key = 0
+        t = ''
+        key_states = {}
+        enter_pressed = false
+        while true do
+            pressed_key = 0
 
-        -- Update enter keypress
-        local enter_was_pressed = enter_pressed
-        local enter_pressed = stat(31) == "\r"
-        if enter_pressed and not enter_was_pressed then
-            pressed_key = 88
-        else
-            -- Update alphanum pressed statuses
-            for scancode = 4, 256, 1 do
-                local was_pressed = key_states[scancode]
-                local pressed = stat(28, scancode)
-                key_states[scancode] = pressed
+            -- Update enter keypress
+            local enter_was_pressed = enter_pressed
+            local enter_pressed = stat(31) == "\r"
+            if enter_pressed and not enter_was_pressed then
+                pressed_key = 88
+            else
+                -- Update alphanum pressed statuses
+                for scancode = 4, 256, 1 do
+                    local was_pressed = key_states[scancode]
+                    local pressed = stat(28, scancode)
+                    key_states[scancode] = pressed
 
-                -- if pressed then print(scancode, 1, 1, 11) end
+                    -- if pressed then print(scancode, 1, 1, 11) end
 
-                -- Initial press only
-                if pressed and not was_pressed then
-                    pressed_key = scancode
-                    break
+                    -- Initial press only
+                    if pressed and not was_pressed then
+                        pressed_key = scancode
+                        break
+                    end
                 end
             end
+
+            -- Manage input line
+            if pressed_key >= 4 and pressed_key <= 39 and #t < 20 then
+                t = t .. sub(kb_chars_alnum, pressed_key - 3, pressed_key - 3)
+            elseif pressed_key == SPACE_SCANCODE and sub(t, #t, #t) ~= " " then
+                t = t .. " "
+            elseif pressed_key == BACKSPACE_SCANCODE and #t > 0 then
+                t = sub(t, 1, #t - 1)
+            elseif pressed_key == ENTER_SCANCODE then
+                break
+            end
+
+            -- Draw user input
+            rectfill(0, 6 * (#SCREEN_TEXT), 127,6 * (#SCREEN_TEXT + 1), 0)
+            local show_cursor = time() % 1 < 0.5
+            local cursor = ""
+            if show_cursor then cursor = "_" else show_cursor = " " end
+            print(">" .. t .. cursor .. "                                      ", 0, 6 * (#SCREEN_TEXT), 11)
+            flip()
+
+            -- https://www.lexaloffle.com/bbs/?tid=41855
+            poke(0x5f30, 1) -- prevents the p character or the enter key from calling the menu.
         end
-
-        -- Manage input line
-        if pressed_key >= 4 and pressed_key <= 39 and #t < 20 then
-            t = t .. sub(kb_chars_alnum, pressed_key - 3, pressed_key - 3)
-        elseif pressed_key == SPACE_SCANCODE and sub(t, #t, #t) ~= " " then
-            t = t .. " "
-        elseif pressed_key == BACKSPACE_SCANCODE and #t > 0 then
-            t = sub(t, 1, #t - 1)
-        elseif pressed_key == ENTER_SCANCODE then
-            break
-        end
-
-        -- Draw user input
-        rectfill(0, 6 * (#SCREEN_TEXT), 127,6 * (#SCREEN_TEXT + 1), 0)
-        local show_cursor = time() % 1 < 0.5
-        local cursor = ""
-        if show_cursor then cursor = "_" else show_cursor = " " end
-        print(">" .. t .. cursor .. "                                      ", 0, 6 * (#SCREEN_TEXT), 11)
-        flip()
-
-        -- https://www.lexaloffle.com/bbs/?tid=41855
-        poke(0x5f30, 1) -- prevents the p character or the enter key from calling the menu.
+        input = sub(t, 1, 20)
     end
-    local input = sub(t, 1, 20)
     FORTRAN_WRITE(sub("\n>" .. input .. "                                      ",1,21) .. "\n\n")
     --print(input)
     local words = split(input, " ", false)
@@ -390,31 +453,31 @@ end
 if true then return {X,Y,Z,YEA} end
 end
 SETUP="0"
-IOBJ = INIT_ARR1(300)
-ICHAIN = INIT_ARR1(100)
-IPLACE = INIT_ARR1(100)
-IFIXED = INIT_ARR1(100)
-COND = INIT_ARR1(300)
-PROP = INIT_ARR1(100)
-ABB = INIT_ARR1(300)
+IOBJ = INIT_ARR1(1000)
+ICHAIN = INIT_ARR1(1000)
+IPLACE = INIT_ARR1(1000)
+IFIXED = INIT_ARR1(1000)
+COND = INIT_ARR1(1000)
+PROP = INIT_ARR1(1000)
+ABB = INIT_ARR1(1000)
 LLINE = INIT_ARR2(1000,22)
-LTEXT = INIT_ARR1(300)
-STEXT = INIT_ARR1(300)
-KEY = INIT_ARR1(300)
-DEFAULT = INIT_ARR1(300)
+LTEXT = INIT_ARR1(1000)
+STEXT = INIT_ARR1(1000)
+KEY = INIT_ARR1(1000)
+DEFAULT = INIT_ARR1(1000)
 TRAVEL = INIT_ARR1(1000)
-TK = INIT_ARR1(25)
+TK = INIT_ARR1(1000)
 KTAB = INIT_ARR1(1000)
 ATAB = INIT_ARR1(1000)
-BTEXT = INIT_ARR1(200)
-DSEEN = INIT_ARR1(10)
-DLOC = INIT_ARR1(10)
-ODLOC = INIT_ARR1(10)
-DTRAV = INIT_ARR1(20)
-RTEXT = INIT_ARR1(100)
-JSPKT = INIT_ARR1(100)
-IPLT = INIT_ARR1(100)
-IFIXT = INIT_ARR1(100)
+BTEXT = INIT_ARR1(1000)
+DSEEN = INIT_ARR1(1000)
+DLOC = INIT_ARR1(1000)
+ODLOC = INIT_ARR1(1000)
+DTRAV = INIT_ARR1(1000)
+RTEXT = INIT_ARR1(1000)
+JSPKT = INIT_ARR1(1000)
+IPLT = INIT_ARR1(1000)
+IFIXT = INIT_ARR1(1000)
 if (SETUP~="0") then
 goto l00001
 end
